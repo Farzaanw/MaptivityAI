@@ -1,20 +1,57 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Maptivity.ai (v0)
 
-# Run and deploy your AI Studio app
+Maptivity.ai is a map-first activity discovery tool.  
+Users search a location, draw a custom region on the map, and get the best activities inside that region.
 
-This contains everything you need to run your app locally.
+This repository contains the **v0 MVP**, focused on proving the core idea.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1wEgi19xjtkZ-IgRYLnAiy2adILHPsiGS
+## What This Version Does
+- Search for a location and move the map to it
+- Draw a custom region (polygon) on the map
+- Find recommended activities inside the drawn region
+- Display results as map pins and a ranked list
 
-## Run Locally
+## What This Version Does Not Do
+- No itinerary generation
+- No bookings or tickets
+- No accounts or authentication
+- No reviews or social features
 
-**Prerequisites:**  Node.js
+## Core Idea
+Instead of browsing endless lists, users define **where they are willing to go** directly on the map and see what’s worth doing there.
+
+## How Recommendations Work
+Activities are ranked using a deterministic algorithm:
+- Only activities inside the drawn region are considered
+- Activities are scored by popularity and relevance
+- Top activities are returned and displayed
+
+LLMs are not used to decide recommendations in v0.
+
+## Tech Stack
+**Frontend**
+- Next.js + TypeScript
+- Mapbox GL JS + Mapbox Draw
+- Tailwind CSS
+
+**Backend**
+- FastAPI or Node.js
+- External Places/POI API (single provider)
+
+## Status
+Early MVP — under active development.
 
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### Prereqs
+- Node.js (recommended: v18+)
+- npm (comes with Node)
+
+### Setup
+1. Clone the repo:
+```
+git clone <REPO_URL>
+cd maptivity-ai
+
+npm install
+- Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+npm run dev
