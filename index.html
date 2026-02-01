@@ -23,5 +23,14 @@
   <body class="bg-gray-50 text-gray-900">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
+    <!-- Google Maps API with Places Library - Key loaded from vite.config.ts -->
+    <script id="google-maps-script"></script>
+    <script>
+      const apiKey = '__VITE_GOOGLE_MAPS_API_KEY__';
+      if (apiKey && apiKey !== '__VITE_GOOGLE_MAPS_API_KEY__') {
+        const script = document.getElementById('google-maps-script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+      }
+    </script>
   </body>
 </html>

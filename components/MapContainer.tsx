@@ -3,7 +3,7 @@
 - CartoDB tiles: provides map imagery
 - Browser Geolocation API - find users current location (permission-based)
 - Gemini + Google maps (optional) - currently used to search for activities */
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 // @ts-ignore
 import L from 'leaflet';
 
@@ -12,9 +12,14 @@ interface MapContainerProps {
   center: { lat: number, lng: number };
 }
 
-const MapContainer: React.FC<MapContainerProps> = ({ onRegionSelect, center }) => {
+interface MapContainerHandle {
+  addMarkerAtLocation: (lat: number, lng: number, title: string) => void;
+}
+
+const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(({ onRegionSelect, center }, ref) => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const markerRef = useRef<L.Marker | null>(null);
 
   useEffect(() => {
     if (containerRef.current && !mapRef.current) {
@@ -73,6 +78,7 @@ const MapContainer: React.FC<MapContainerProps> = ({ onRegionSelect, center }) =
       <div ref={containerRef} className="w-full h-full" />
     </div>
   );
-};
+});
 
+MapContainer.displayName = 'MapContainer';
 export default MapContainer;
