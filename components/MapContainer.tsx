@@ -1,4 +1,8 @@
-
+/* Uses open-source map providers
+- Leaflet: display interactive map
+- CartoDB tiles: provides map imagery
+- Browser Geolocation API - find users current location (permission-based)
+- Gemini + Google maps (optional) - currently used to search for activities */
 import React, { useEffect, useRef } from 'react';
 // @ts-ignore
 import L from 'leaflet';

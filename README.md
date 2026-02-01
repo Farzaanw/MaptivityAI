@@ -50,8 +50,8 @@ Early MVP — under active development.
 1. Clone the repo:
 ```
 git clone <REPO_URL>
-cd maptivity-ai
+cd MaptivityAI
 
 npm install
-- Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+- Optional (not necessary for development): Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 npm run dev

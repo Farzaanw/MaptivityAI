@@ -28,19 +28,23 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Function to handle search
   const handleSearch = useCallback(async (query: string) => {
     setIsLoading(true);
     setSearchQuery(query);
+    // call to Gemini API to fetch activities based on query and currentLocation
     const result = await findActivities(query, currentLocation.lat, currentLocation.lng);
     setActivities(result.activities);
     setIsLoading(false);
     setIsSidebarOpen(true);
   }, [currentLocation]);
 
+  // Function to handle map scroll/move
   const handleMapMove = useCallback((lat: number, lng: number) => {
     setCurrentLocation({ lat, lng });
   }, []);
 
+  // Toggle sidebar visibility
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
   return (
@@ -48,11 +52,13 @@ const App: React.FC = () => {
       <Header />
       
       <main className="flex-1 relative">
+        {/* Display/Setup Map */}
         <MapContainer 
           onRegionSelect={handleMapMove}
           center={currentLocation}
         />
 
+        {/* Display/Setup Sidebar */}
         <Sidebar 
           isOpen={isSidebarOpen}
           toggle={toggleSidebar}

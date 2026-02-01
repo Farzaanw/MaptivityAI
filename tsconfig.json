@@ -1,3 +1,15 @@
+/**
+ * TypeScript Configuration
+ * 
+ * Configures the TypeScript compiler for the Maptivity project.
+ * - target: JavaScript version to compile to (ES2022)
+ * - jsx: How to handle JSX syntax (react-jsx)
+ * - strict: Enable strict type checking for type safety
+ * - moduleResolution: How to resolve module imports
+ * 
+ * This file controls how TypeScript compiles .ts and .tsx files into JavaScript.
+ */
+
 {
   "compilerOptions": {
     "target": "ES2022",

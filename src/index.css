@@ -1,0 +1,13 @@
+/**
+ * Tailwind CSS Entry Point
+ * 
+ * Imports all three layers of Tailwind CSS:
+ * - base: Reset styles and base element styles
+ * - components: Pre-built component classes
+ * - utilities: Utility classes for styling (e.g., p-4, text-center, etc.)
+ * 
+ * This file is imported in index.tsx and processed by PostCSS during build.
+ */
+
+@import "tailwindcss";
+
