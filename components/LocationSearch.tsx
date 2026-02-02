@@ -2,6 +2,7 @@
  * Location Search Component with Google Places Autocomplete
  * 
  * Provides autocomplete suggestions for cities/locations as user types.
+ * Uses the new Places API (v2) AutocompleteSuggestion service.
  * When a location is selected, it centers the map and adds a marker.
  */
 
@@ -16,25 +17,37 @@ interface LocationSearchProps {
 
 const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpen, inputValue, onInputChange }) => {
   const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.AutocompleteService | null>(null);
-  const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
-  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
-  const [suggestions, setSuggestions] = useState<google.maps.places.AutocompletePrediction[]>([]);
+  const sessionTokenRef = useRef<any>(null);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [googleReady, setGoogleReady] = useState(false);
 
-  // Initialize Google Places services
+  // Check if Google Maps API is loaded
   useEffect(() => {
-    if (typeof google !== 'undefined' && isOpen) {
-      if (!autocompleteRef.current) {
-        autocompleteRef.current = new google.maps.places.AutocompleteService();
-        sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
+    const checkGoogleReady = () => {
+      if (typeof google !== 'undefined' && google.maps && google.maps.places) {
+        setGoogleReady(true);
+      } else {
+        setTimeout(checkGoogleReady, 100);
       }
-      inputRef.current?.focus();
+    };
+    checkGoogleReady();
+  }, []);
+
+  // Initialize session token
+  useEffect(() => {
+    if (googleReady && isOpen && !sessionTokenRef.current) {
+      try {
+        sessionTokenRef.current = new (window as any).google.maps.places.AutocompleteSessionToken();
+        inputRef.current?.focus();
+      } catch (error) {
+        console.error('Error initializing session token:', error);
+      }
     }
-  }, [isOpen]);
+  }, [googleReady, isOpen]);
 
   // Handle input change and fetch suggestions
-  const handleInputChange = async (value: string) => {
+  const handleInputChange = (value: string) => {
     onInputChange(value);
     
     if (value.length < 2) {
@@ -42,53 +55,82 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
       return;
     }
 
-    if (!autocompleteRef.current) return;
+    if (!googleReady) {
+      console.warn('Google Maps API not ready');
+      return;
+    }
 
     setLoading(true);
+    fetchSuggestions(value);
+  };
+
+  // Fetch suggestions using the new Places API (New)
+  const fetchSuggestions = async (input: string) => {
+    if (!input) return;
+
+    setLoading(true);
+
     try {
-      const response = await autocompleteRef.current.getPlacePredictions({
-        input: value,
-        types: ['(cities)'], // Restrict to cities only
-        sessionToken: sessionTokenRef.current,
-      });
-      setSuggestions(response.predictions || []);
-    } catch (error) {
-      console.error('Autocomplete error:', error);
+      const { AutocompleteSuggestion } =
+        await google.maps.importLibrary("places");
+
+      const response =
+        await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input,
+          sessionToken: sessionTokenRef.current,
+          includedRegionCodes: ["us"],
+        });
+
+      setSuggestions(response.suggestions ?? []);
+    } catch (err) {
+      console.error("Autocomplete error:", err);
+      setSuggestions([]);
     } finally {
       setLoading(false);
     }
   };
 
   // Handle suggestion selection
-  const handleSuggestionClick = async (prediction: google.maps.places.AutocompletePrediction) => {
-    if (!prediction.place_id) return;
-
+  const handleSuggestionClick = async (suggestion: any) => {
     setLoading(true);
-    try {
-      // Use a temporary div as the container for PlacesService
-      const tempDiv = document.createElement('div');
-      placesServiceRef.current = new google.maps.places.PlacesService(tempDiv);
 
-      placesServiceRef.current.getDetails(
-        {
-          placeId: prediction.place_id,
-          fields: ['geometry', 'formatted_address'],
-          sessionToken: sessionTokenRef.current,
-        },
-        (placeDetails, status) => {
-          if (status === google.maps.places.PlacesServiceStatus.OK && placeDetails?.geometry?.location) {
-            const lat = placeDetails.geometry.location.lat();
-            const lng = placeDetails.geometry.location.lng();
-            onLocationSelect(lat, lng, prediction.main_text);
-            setSuggestions([]);
-            onInputChange('');
-            // Reset session token for next search
-            sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
-          }
-        }
-      );
+    try {
+      const placePrediction = suggestion.placePrediction;
+
+      const place = await placePrediction
+        .toPlace()
+        .fetchFields({
+          fields: ["location", "viewport", "formattedAddress"],
+        });
+
+      let lat: number;
+      let lng: number;
+
+      if (place.location) {
+        lat = place.location.lat();
+        lng = place.location.lng();
+      } else if (place.viewport) {
+        const center = place.viewport.getCenter();
+        lat = center.lat();
+        lng = center.lng();
+      } else {
+        throw new Error("No location or viewport returned");
+      }
+
+      const locationName =
+        place.formattedAddress ??
+        placePrediction.text.text;
+
+      onLocationSelect(lat, lng, locationName);
+
+      setSuggestions([]);
+      onInputChange("");
+
+      sessionTokenRef.current =
+        new (window as any).google.maps.places.AutocompleteSessionToken();
+
     } catch (error) {
-      console.error('Place details error:', error);
+      console.error("Place select error:", error);
     } finally {
       setLoading(false);
     }
@@ -122,14 +164,19 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
         {/* Suggestions dropdown */}
         {suggestions.length > 0 && (
           <div className="flex-1 overflow-y-auto bg-gray-50 rounded-lg border border-gray-200">
-            {suggestions.map((suggestion) => (
+            {suggestions.map((suggestion, index) => (
               <button
-                key={suggestion.place_id}
+                key={index}
                 onClick={() => handleSuggestionClick(suggestion)}
                 className="w-full text-left px-4 py-3 hover:bg-indigo-50 border-b border-gray-200 last:border-b-0 transition-colors"
               >
-                <div className="font-medium text-gray-800 text-sm">{suggestion.main_text}</div>
-                <div className="text-gray-500 text-xs">{suggestion.secondary_text}</div>
+                {/* <div className="font-medium text-gray-800 text-sm">{suggestion.main_text || suggestion.mainText || suggestion.description}</div> */}
+                  {/* New API uses 'placePrediction', Legacy used 'description' */}
+                <div className="font-medium text-gray-800 text-sm">
+                  {suggestion.placePrediction?.text?.text ?? "Unknown location"}
+                </div>
+
+                <div className="text-gray-500 text-xs">{suggestion.secondary_text || suggestion.secondaryText}</div>
               </button>
             ))}
           </div>
