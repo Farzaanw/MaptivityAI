@@ -96,15 +96,15 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
 
     try {
       const placePrediction = suggestion.placePrediction;
+      let lat: number | null = null;
+      let lng: number | null = null;
 
+      // 1️⃣ Try Places API (New)
       const place = await placePrediction
         .toPlace()
         .fetchFields({
           fields: ["location", "viewport", "formattedAddress"],
         });
-
-      let lat: number;
-      let lng: number;
 
       if (place.location) {
         lat = place.location.lat();
@@ -113,13 +113,26 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
         const center = place.viewport.getCenter();
         lat = center.lat();
         lng = center.lng();
-      } else {
-        throw new Error("No location or viewport returned");
+      }
+
+      // 2️⃣ Fallback: Geocode the text
+      if (lat === null || lng === null) {
+        const geocoder = new google.maps.Geocoder();
+
+        const geocodeResult = await geocoder.geocode({
+          address: placePrediction.text.text,
+        });
+
+        if (geocodeResult.results[0]?.geometry?.location) {
+          lat = geocodeResult.results[0].geometry.location.lat();
+          lng = geocodeResult.results[0].geometry.location.lng();
+        } else {
+          throw new Error("Geocoding failed");
+        }
       }
 
       const locationName =
-        place.formattedAddress ??
-        placePrediction.text.text;
+        place.formattedAddress ?? placePrediction.text.text;
 
       onLocationSelect(lat, lng, locationName);
 
@@ -127,7 +140,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
       onInputChange("");
 
       sessionTokenRef.current =
-        new (window as any).google.maps.places.AutocompleteSessionToken();
+        new google.maps.places.AutocompleteSessionToken();
 
     } catch (error) {
       console.error("Place select error:", error);
