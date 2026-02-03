@@ -9,7 +9,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 
 interface LocationSearchProps {
-  onLocationSelect: (lat: number, lng: number, locationName: string) => void;
+  onLocationSelect: (lat: number, lng: number, locationName: string, bounds: [[number, number], [number, number]]) => void;
   isOpen: boolean;
   inputValue: string;
   onInputChange: (value: string) => void;
@@ -64,6 +64,14 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
     fetchSuggestions(value);
   };
 
+  // Handle Enter key press
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && suggestions.length > 0) {
+      e.preventDefault();
+      handleSuggestionClick(suggestions[0]);
+    }
+  };
+
   // Fetch suggestions using the new Places API (New)
   const fetchSuggestions = async (input: string) => {
     if (!input) return;
@@ -99,11 +107,11 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
       let lat: number | null = null;
       let lng: number | null = null;
 
-      // 1️⃣ Try Places API (New)
+      // 1️⃣ Try Places API (New) - fetch location, viewport, address, and types
       const place = await placePrediction
         .toPlace()
         .fetchFields({
-          fields: ["location", "viewport", "formattedAddress"],
+          fields: ["location", "viewport", "formattedAddress", "types"],
         });
 
       if (place.location) {
@@ -133,8 +141,16 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
 
       const locationName =
         place.formattedAddress ?? placePrediction.text.text;
+      
+      // Extract bounds from viewport (Google's recommended view for this location)
+      let bounds: [[number, number], [number, number]] = [[lat - 0.01, lng - 0.01], [lat + 0.01, lng + 0.01]];
+      if (place.viewport) {
+        const sw = place.viewport.getSouthWest();
+        const ne = place.viewport.getNorthEast();
+        bounds = [[sw.lat(), sw.lng()], [ne.lat(), ne.lng()]];
+      }
 
-      onLocationSelect(lat, lng, locationName);
+      onLocationSelect(lat, lng, locationName, bounds);
 
       setSuggestions([]);
       onInputChange("");
@@ -152,7 +168,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
   if (!isOpen) return null;
 
   return (
-    <div className="absolute bottom-0 left-0 w-80 h-96 bg-white shadow-2xl rounded-tr-lg p-6 z-30 flex flex-col gap-4 animate-in fade-in slide-in-from-left-4 duration-200">
+    <div className="absolute bottom-4 left-4 w-80 h-96 bg-white shadow-2xl rounded-lg p-6 z-30 flex flex-col gap-4 animate-in fade-in slide-in-from-left-4 duration-200">
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-bold text-gray-800">Search Location</h2>
       </div>
@@ -164,6 +180,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
             type="text"
             value={inputValue}
             onChange={(e) => handleInputChange(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Enter city, state, or country..."
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />

@@ -33,11 +33,11 @@ const App: React.FC = () => {
   }, []);
 
   // Handle location selection from Places Autocomplete
-  const handleLocationSelect = useCallback((lat: number, lng: number, locationName: string) => {
+  const handleLocationSelect = useCallback((lat: number, lng: number, locationName: string, bounds: [[number, number], [number, number]]) => {
     setCurrentLocation({ lat, lng });
-    // Add marker at selected location
+    // Add marker at selected location with bounds that fit the location perfectly
     if (mapContainerRef.current) {
-      mapContainerRef.current.addMarkerAtLocation(lat, lng, locationName);
+      mapContainerRef.current.addMarkerAtLocation(lat, lng, locationName, bounds);
     }
   }, []);
 
@@ -67,6 +67,7 @@ const App: React.FC = () => {
       <main className="flex-1 relative">
         {/* Display/Setup Map */}
         <MapContainer 
+          ref={mapContainerRef}
           onRegionSelect={handleMapMove}
           center={currentLocation}
         />

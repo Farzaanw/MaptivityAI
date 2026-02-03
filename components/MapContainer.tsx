@@ -13,7 +13,7 @@ interface MapContainerProps {
 }
 
 interface MapContainerHandle {
-  addMarkerAtLocation: (lat: number, lng: number, title: string) => void;
+  addMarkerAtLocation: (lat: number, lng: number, title: string, bounds: [[number, number], [number, number]]) => void;
 }
 
 const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(({ onRegionSelect, center }, ref) => {
@@ -49,6 +49,9 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(({ onRegi
       mapRef.current.on('moveend', () => {
         if (mapRef.current) {
           const newCenter = mapRef.current.getCenter();
+          // DEBUGGING:
+          // const zoomLevel = mapRef.current.getZoom();
+          // console.log('Zoom level:', zoomLevel);
           onRegionSelect(newCenter.lat, newCenter.lng);
         }
       });
@@ -72,6 +75,35 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(({ onRegi
       }
     }
   }, [center]);
+
+  // Expose method to add marker at location and fit bounds to center it on screen
+  useImperativeHandle(ref, () => ({
+    addMarkerAtLocation: (lat: number, lng: number, title: string, bounds: [[number, number], [number, number]]) => {
+      if (mapRef.current) {
+        // Remove existing marker if present
+        if (markerRef.current) {
+          markerRef.current.remove();
+        }
+        
+        // Create red pin marker icon
+        const redMarker = L.icon({
+          iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 60"><path fill="%23EF2323" d="M20 0C8.95 0 0 8.95 0 20c0 11 20 40 20 40s20-29 20-40c0-11.05-8.95-20-20-20zm0 28c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/><circle cx="20" cy="20" r="6" fill="white"/></svg>',
+          iconSize: [32, 48],
+          iconAnchor: [16, 48],
+          popupAnchor: [0, -48],
+        });
+        
+        // Place marker on the map
+        markerRef.current = L.marker([lat, lng], { icon: redMarker })
+          .bindPopup(title)
+          .addTo(mapRef.current)
+          .openPopup();
+        
+        // Fit map bounds to show entire location - Leaflet automatically calculates best zoom
+        mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
+      }
+    },
+  }));
 
   return (
     <div className="absolute inset-0 z-0 bg-[#ebe7e0]">
