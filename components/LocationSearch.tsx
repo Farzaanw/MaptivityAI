@@ -21,6 +21,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
 
   // Check if Google Maps API is loaded
   useEffect(() => {
@@ -167,28 +168,46 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
   if (!isOpen) return null;
 
   return (
-    <div className="absolute bottom-4 left-4 w-80 h-96 bg-white shadow-2xl rounded-lg p-6 z-30 flex flex-col gap-4 animate-in fade-in slide-in-from-left-4 duration-200">
+    <div className={`absolute bottom-4 left-4 bg-white shadow-2xl rounded-lg z-30 flex flex-col gap-4 animate-in fade-in slide-in-from-left-4 duration-200 transition-all ${
+      isMinimized ? 'w-48 h-14 p-3' : 'w-80 h-96 p-6'
+    }`}>
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-bold text-gray-800">Search Location</h2>
+        <button
+          onClick={() => setIsMinimized(!isMinimized)}
+          className="text-gray-500 hover:text-gray-700 transition-colors"
+          title={isMinimized ? 'Expand' : 'Minimize'}
+        >
+          {isMinimized ? (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 10a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2z" clipRule="evenodd" />
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm16 2v10a4 4 0 01-4 4H4v-2a2 2 0 012-2h10a2 2 0 012-2h4V5z" clipRule="evenodd" />
+            </svg>
+          )}
+        </button>
       </div>
 
-      <div className="flex-1 flex flex-col gap-3 overflow-hidden">
-        <div className="relative">
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputValue}
-            onChange={(e) => handleInputChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Enter city, state, or country..."
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          {loading && (
-            <div className="absolute right-3 top-2.5">
-              <div className="animate-spin h-5 w-5 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
-            </div>
-          )}
-        </div>
+      {!isMinimized && (
+        <div className="flex-1 flex flex-col gap-3 overflow-hidden">
+          <div className="relative">
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={(e) => handleInputChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Enter city, state, or country..."
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            {loading && (
+              <div className="absolute right-3 top-2.5">
+                <div className="animate-spin h-5 w-5 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
+              </div>
+            )}
+          </div>
 
         {/* Suggestions dropdown */}
         {suggestions.length > 0 && (
@@ -217,6 +236,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };
