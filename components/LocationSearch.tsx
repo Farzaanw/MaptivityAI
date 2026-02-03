@@ -86,7 +86,6 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
         await AutocompleteSuggestion.fetchAutocompleteSuggestions({
           input,
           sessionToken: sessionTokenRef.current,
-          includedRegionCodes: ["us"],
         });
 
       setSuggestions(response.suggestions ?? []);
