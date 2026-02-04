@@ -1,116 +1,270 @@
-/* Uses open-source map providers
-- Leaflet: display interactive map
-- CartoDB tiles: provides map imagery
-- Browser Geolocation API - find users current location (permission-based)
-- Gemini + Google maps (optional) - currently used to search for activities */
+/* Uses Google Maps JavaScript API
+- Drawing Library: polygon drawing with DrawingManager
+- Places API (optional): used by LocationSearch for autocomplete */
 import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
-// @ts-ignore
-import L from 'leaflet';
+
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
 
 interface MapContainerProps {
   onRegionSelect: (lat: number, lng: number) => void;
-  center: { lat: number, lng: number };
+  center: { lat: number; lng: number };
+  polygonCoordinates: LatLng[];
+  onPolygonChange: (coords: LatLng[]) => void;
+  isDrawingMode: boolean;
+  onDrawingModeChange: (enabled: boolean) => void;
+  onMapReady?: (map: google.maps.Map) => void;
 }
 
 interface MapContainerHandle {
-  addMarkerAtLocation: (lat: number, lng: number, title: string, bounds: [[number, number], [number, number]]) => void;
+  addMarkerAtLocation: (
+    lat: number,
+    lng: number,
+    title: string,
+    bounds: [[number, number], [number, number]]
+  ) => void;
+  clearPolygon: () => void;
 }
 
-const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(({ onRegionSelect, center }, ref) => {
-  const mapRef = useRef<L.Map | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const markerRef = useRef<L.Marker | null>(null);
+function pathToCoordinates(path: google.maps.MVCArray<google.maps.LatLng>): LatLng[] {
+  const coords: LatLng[] = [];
+  for (let i = 0; i < path.getLength(); i++) {
+    const point = path.getAt(i);
+    coords.push({ lat: point.lat(), lng: point.lng() });
+  }
+  return coords;
+}
 
-  useEffect(() => {
-    if (containerRef.current && !mapRef.current) {
-      // Define bounds that only restrict latitude (to prevent grey poles)
-      // We use a very large longitude range to simulate infinite horizontal scrolling
-      const corner1 = L.latLng(-85.0511, -1000000);
-      const corner2 = L.latLng(85.0511, 1000000);
-      const bounds = L.latLngBounds(corner1, corner2);
-
-      // Initialize map with horizontal looping enabled
-      mapRef.current = L.map(containerRef.current, {
-        zoomControl: false,
-        attributionControl: false,
-        maxBounds: bounds,
-        maxBoundsViscosity: 1.0, // Stays "sticky" at the vertical limits
-        minZoom: 2,
-        worldCopyJump: true, // Smoothly handle marker/view wrapping across the date line
-      }).setView([center.lat, center.lng], 13);
-
-      // Add "Google Maps" style tiles with wrapping enabled
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        maxZoom: 20,
-        noWrap: false, // Enable horizontal wrapping like a globe
-      }).addTo(mapRef.current);
-
-      // Map move listener
-      mapRef.current.on('moveend', () => {
-        if (mapRef.current) {
-          const newCenter = mapRef.current.getCenter();
-          // DEBUGGING:
-          // const zoomLevel = mapRef.current.getZoom();
-          // console.log('Zoom level:', zoomLevel);
-          onRegionSelect(newCenter.lat, newCenter.lng);
-        }
-      });
-    }
-
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-    };
-  }, []);
-
-  // Update center if it changes externally
-  useEffect(() => {
-    if (mapRef.current) {
-      const current = mapRef.current.getCenter();
-      // Use panTo for a smoother transition if the distance is small
-      if (Math.abs(current.lat - center.lat) > 0.001 || Math.abs(current.lng - center.lng) > 0.001) {
-        mapRef.current.panTo([center.lat, center.lng]);
-      }
-    }
-  }, [center]);
-
-  // Expose method to add marker at location and fit bounds to center it on screen
-  useImperativeHandle(ref, () => ({
-    addMarkerAtLocation: (lat: number, lng: number, title: string, bounds: [[number, number], [number, number]]) => {
-      if (mapRef.current) {
-        // Remove existing marker if present
-        if (markerRef.current) {
-          markerRef.current.remove();
-        }
-        
-        // Create red pin marker icon
-        const redMarker = L.icon({
-          iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 60"><path fill="%23EF2323" d="M20 0C8.95 0 0 8.95 0 20c0 11 20 40 20 40s20-29 20-40c0-11.05-8.95-20-20-20zm0 28c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/><circle cx="20" cy="20" r="6" fill="white"/></svg>',
-          iconSize: [32, 48],
-          iconAnchor: [16, 48],
-          popupAnchor: [0, -48],
-        });
-        
-        // Place marker on the map
-        markerRef.current = L.marker([lat, lng], { icon: redMarker })
-          .bindPopup(title)
-          .addTo(mapRef.current)
-          .openPopup();
-        
-        // Fit map bounds to show entire location - Leaflet automatically calculates best zoom
-        mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
-      }
+const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
+  (
+    {
+      onRegionSelect,
+      center,
+      polygonCoordinates,
+      onPolygonChange,
+      isDrawingMode,
+      onDrawingModeChange,
+      onMapReady,
     },
-  }));
+    ref
+  ) => {
+    const mapRef = useRef<google.maps.Map | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const markerRef = useRef<google.maps.Marker | null>(null);
+    const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null);
+    const polygonRef = useRef<google.maps.Polygon | null>(null);
+    const polygonListenersRef = useRef<google.maps.MapsEventListener[]>([]);
+    const idleListenerRef = useRef<google.maps.MapsEventListener | null>(null);
 
-  return (
-    <div className="absolute inset-0 z-0 bg-[#ebe7e0]">
-      <div ref={containerRef} className="w-full h-full" />
-    </div>
-  );
-});
+    // Initialize map once (wait for Google Maps API to load)
+    useEffect(() => {
+      if (!containerRef.current) return;
+
+      let cleanupFn: (() => void) | null = null;
+
+      const initMap = () => {
+        if (
+          typeof google === 'undefined' ||
+          !google.maps ||
+          !google.maps.drawing
+        ) {
+          setTimeout(initMap, 100);
+          return;
+        }
+
+        const map = new google.maps.Map(containerRef.current!, {
+          center: { lat: center.lat, lng: center.lng },
+          zoom: 13,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: true,
+          zoomControl: true,
+        });
+
+        mapRef.current = map;
+        onMapReady?.(map);
+
+        idleListenerRef.current = map.addListener('idle', () => {
+          if (mapRef.current) {
+            const mapCenter = mapRef.current.getCenter();
+            if (mapCenter) {
+              onRegionSelect(mapCenter.lat(), mapCenter.lng());
+            }
+          }
+        });
+
+        cleanupFn = () => {
+          if (idleListenerRef.current) {
+            google.maps.event.removeListener(idleListenerRef.current);
+          }
+          polygonListenersRef.current.forEach((l) =>
+            google.maps.event.removeListener(l)
+          );
+          polygonListenersRef.current = [];
+          if (polygonRef.current) {
+            polygonRef.current.setMap(null);
+            polygonRef.current = null;
+          }
+          if (drawingManagerRef.current) {
+            drawingManagerRef.current.setMap(null);
+            drawingManagerRef.current = null;
+          }
+          if (markerRef.current) {
+            markerRef.current.setMap(null);
+            markerRef.current = null;
+          }
+          mapRef.current = null;
+        };
+      };
+
+      initMap();
+
+      return () => {
+        if (cleanupFn) cleanupFn();
+      };
+    }, []);
+
+    // Update center when prop changes
+    useEffect(() => {
+      if (mapRef.current) {
+        const current = mapRef.current.getCenter();
+        if (
+          current &&
+          (Math.abs(current.lat() - center.lat) > 0.001 ||
+            Math.abs(current.lng() - center.lng) > 0.001)
+        ) {
+          mapRef.current.panTo({ lat: center.lat, lng: center.lng });
+        }
+      }
+    }, [center]);
+
+    // DrawingManager setup and polygon drawing
+    useEffect(() => {
+      if (!mapRef.current || typeof google === 'undefined') return;
+
+      const map = mapRef.current;
+
+      const attachPathListeners = (polygon: google.maps.Polygon) => {
+        const path = polygon.getPath();
+        const syncCoords = () => {
+          const coords = pathToCoordinates(path);
+          onPolygonChange(coords);
+          console.log('Polygon coordinates updated:', coords);
+        };
+        polygonListenersRef.current.push(path.addListener('insert_at', syncCoords));
+        polygonListenersRef.current.push(path.addListener('set_at', syncCoords));
+        polygonListenersRef.current.push(path.addListener('remove_at', syncCoords));
+      };
+
+      const removeExistingPolygon = () => {
+        if (polygonRef.current) {
+          polygonListenersRef.current.forEach((l) => google.maps.event.removeListener(l));
+          polygonListenersRef.current = [];
+          polygonRef.current.setMap(null);
+          polygonRef.current = null;
+          onPolygonChange([]);
+        }
+      };
+
+      if (isDrawingMode) {
+        if (!drawingManagerRef.current) {
+          const drawingManager = new google.maps.drawing.DrawingManager({
+            drawingMode: google.maps.drawing.OverlayType.POLYGON,
+            drawingControl: false,
+          });
+          drawingManager.setMap(map);
+          drawingManagerRef.current = drawingManager;
+
+          drawingManager.addListener('polygoncomplete', (polygon: google.maps.Polygon) => {
+            removeExistingPolygon();
+
+            polygon.setEditable(true);
+            polygon.setDraggable(true);
+            polygonRef.current = polygon;
+
+            attachPathListeners(polygon);
+            const coords = pathToCoordinates(polygon.getPath());
+            onPolygonChange(coords);
+            console.log('Polygon coordinates updated:', coords);
+
+            // Turn off drawing mode after completing a polygon
+            onDrawingModeChange(false);
+            drawingManager.setDrawingMode(null);
+          });
+        }
+        drawingManagerRef.current.setMap(map);
+        drawingManagerRef.current.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+      } else {
+        if (drawingManagerRef.current) {
+          drawingManagerRef.current.setDrawingMode(null);
+        }
+      }
+
+      return () => {
+        if (isDrawingMode && drawingManagerRef.current) {
+          drawingManagerRef.current.setDrawingMode(null);
+        }
+      };
+    }, [isDrawingMode, onPolygonChange, onDrawingModeChange]);
+
+    // Clear polygon when coordinates become empty (external clear)
+    useEffect(() => {
+      if (polygonCoordinates.length === 0 && polygonRef.current) {
+        polygonListenersRef.current.forEach((l) => google.maps.event.removeListener(l));
+        polygonListenersRef.current = [];
+        polygonRef.current.setMap(null);
+        polygonRef.current = null;
+      }
+    }, [polygonCoordinates.length]);
+
+    useImperativeHandle(ref, () => ({
+      addMarkerAtLocation: (
+        lat: number,
+        lng: number,
+        title: string,
+        bounds: [[number, number], [number, number]]
+      ) => {
+        if (!mapRef.current) return;
+
+        if (markerRef.current) {
+          markerRef.current.setMap(null);
+        }
+
+        const marker = new google.maps.Marker({
+          position: { lat, lng },
+          map: mapRef.current,
+          title,
+        });
+        markerRef.current = marker;
+
+        const sw = new google.maps.LatLng(bounds[0][0], bounds[0][1]);
+        const ne = new google.maps.LatLng(bounds[1][0], bounds[1][1]);
+        const boundsObj = new google.maps.LatLngBounds(sw, ne);
+        mapRef.current.fitBounds(boundsObj, { padding: 50, maxZoom: 18 });
+      },
+      clearPolygon: () => {
+        if (polygonRef.current) {
+          polygonListenersRef.current.forEach((l) => google.maps.event.removeListener(l));
+          polygonListenersRef.current = [];
+          polygonRef.current.setMap(null);
+          polygonRef.current = null;
+        }
+        if (drawingManagerRef.current) {
+          drawingManagerRef.current.setDrawingMode(null);
+        }
+        onPolygonChange([]);
+      },
+    }));
+
+    return (
+      <div className="absolute inset-0 z-0 bg-[#ebe7e0]">
+        <div ref={containerRef} className="map-container w-full h-full" />
+      </div>
+    );
+  }
+);
 
 MapContainer.displayName = 'MapContainer';
 export default MapContainer;
