@@ -23,5 +23,17 @@ dist-ssr
 *.sln
 *.sw?
 
-# Environment variables
+# Environment variables (contain API keys, secrets)
 .env
+.env.local
+.env.*.local
+
+# Build output
+build
+
+# Cache
+.cache
+*.tsbuildinfo
+
+# OS
+Thumbs.db
