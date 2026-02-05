@@ -112,8 +112,24 @@ This project requires a Google Maps API key with the following APIs enabled:
 - Places API (New)
 - Optional: Geocoding API (used as fallback)
 
-- Create .env file in project root and add:
+Create `.env` file in project root and add:
+```
 VITE_GOOGLE_MAPS_API_KEY=your_api_key_here
+```
 
-### 4. Start App
+### 4. Unsplash API Setup
+
+The app fetches location images from Unsplash. The API key is embedded in the code but should be moved to environment variables for security:
+
+1. Get free API key at https://unsplash.com/developers
+2. Update `services/unsplashService.ts` to use environment variable:
+```
+const UNSPLASH_API_KEY = import.meta.env.VITE_UNSPLASH_API_KEY;
+```
+3. Add to `.env`:
+```
+VITE_UNSPLASH_API_KEY=your_unsplash_api_key_here
+```
+
+### 5. Start App
 npm run dev
