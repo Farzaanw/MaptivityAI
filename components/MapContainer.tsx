@@ -1,6 +1,7 @@
-/* Uses Google Maps JavaScript API
+/* Uses Google Maps JavaScript API for interactive map display
+- Google Maps API: display interactive map with markers and bounds
 - Drawing Library: polygon drawing with DrawingManager
-- Places API (optional): used by LocationSearch for autocomplete */
+- Browser Geolocation API - find users current location (permission-based) */
 import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 
 export interface LatLng {
@@ -15,16 +16,10 @@ interface MapContainerProps {
   onPolygonChange: (coords: LatLng[]) => void;
   isDrawingMode: boolean;
   onDrawingModeChange: (enabled: boolean) => void;
-  onMapReady?: (map: google.maps.Map) => void;
 }
 
 interface MapContainerHandle {
-  addMarkerAtLocation: (
-    lat: number,
-    lng: number,
-    title: string,
-    bounds: [[number, number], [number, number]]
-  ) => void;
+  addMarkerAtLocation: (lat: number, lng: number, title: string, bounds: [[number, number], [number, number]]) => void;
   clearPolygon: () => void;
 }
 
@@ -38,18 +33,7 @@ function pathToCoordinates(path: google.maps.MVCArray<google.maps.LatLng>): LatL
 }
 
 const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
-  (
-    {
-      onRegionSelect,
-      center,
-      polygonCoordinates,
-      onPolygonChange,
-      isDrawingMode,
-      onDrawingModeChange,
-      onMapReady,
-    },
-    ref
-  ) => {
+  ({ onRegionSelect, center, polygonCoordinates, onPolygonChange, isDrawingMode, onDrawingModeChange }, ref) => {
     const mapRef = useRef<google.maps.Map | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const markerRef = useRef<google.maps.Marker | null>(null);
@@ -57,88 +41,80 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
     const polygonRef = useRef<google.maps.Polygon | null>(null);
     const polygonListenersRef = useRef<google.maps.MapsEventListener[]>([]);
     const idleListenerRef = useRef<google.maps.MapsEventListener | null>(null);
+    const [mapType, setMapType] = React.useState<'roadmap' | 'satellite'>('roadmap');
 
-    // Initialize map once (wait for Google Maps API to load)
+    // Initialize map once
     useEffect(() => {
-      if (!containerRef.current) return;
+      if (containerRef.current && !mapRef.current) {
+        // Define vertical bounds - prevent scrolling past map edges
+        const verticalBounds = new google.maps.LatLngBounds(
+          new google.maps.LatLng(-85.0511, -180),
+          new google.maps.LatLng(85.0511, 180)
+        );
 
-      let cleanupFn: (() => void) | null = null;
+        // Calculate minimum zoom level to fit vertical bounds in viewport
+        const calculateMinZoom = () => {
+          if (!containerRef.current) return 1;
+          
+          const containerHeight = containerRef.current.clientHeight;
+          
+          // For Web Mercator projection, ±85.0511° spans ~340 pixels at zoom 0
+          // At each zoom level, this doubles
+          // We need zoom level where 340 * 2^z >= containerHeight
+          const pixelsPerZoom0 = 340;
+          const minZoom = Math.log2(containerHeight / pixelsPerZoom0);
+          
+          return Math.max(0, minZoom);
+        };
 
-      const initMap = () => {
-        if (
-          typeof google === 'undefined' ||
-          !google.maps ||
-          !google.maps.drawing
-        ) {
-          setTimeout(initMap, 100);
-          return;
-        }
+        const initialMinZoom = calculateMinZoom();
 
-        const map = new google.maps.Map(containerRef.current!, {
-          center: { lat: center.lat, lng: center.lng },
+        // Initialize Google Maps
+        mapRef.current = new google.maps.Map(containerRef.current, {
           zoom: 13,
-          mapTypeControl: false,
+          center: { lat: center.lat, lng: center.lng },
+          mapTypeId: 'roadmap',
+          zoomControl: false,
+          fullscreenControl: false,
           streetViewControl: false,
-          fullscreenControl: true,
-          zoomControl: true,
+          mapTypeControl: false,
+          minZoom: initialMinZoom,
+          maxZoom: 21,
+          draggableCursor: 'grab',
+          draggingCursor: 'grabbing',
+          // Restrict both vertical panning and scrolling to prevent grey space
+          restriction: {
+            latLngBounds: verticalBounds,
+            strictBounds: false, // Allow smooth wrapping at dateline instead of hard edges
+          },
         });
 
-        mapRef.current = map;
-        onMapReady?.(map);
-
-        idleListenerRef.current = map.addListener('idle', () => {
+        // Handle map movement and normalize longitude for display
+        mapRef.current.addListener('center_changed', () => {
           if (mapRef.current) {
-            const mapCenter = mapRef.current.getCenter();
-            if (mapCenter) {
-              onRegionSelect(mapCenter.lat(), mapCenter.lng());
+            const newCenter = mapRef.current.getCenter();
+            if (newCenter) {
+              let lng = newCenter.lng();
+              let lat = newCenter.lat();
+              
+              // Normalize longitude to -180 to 180 for display
+              while (lng > 180) {
+                lng -= 360;
+              }
+              while (lng < -180) {
+                lng += 360;
+              }
+              
+              onRegionSelect(lat, lng);
             }
           }
         });
-
-        cleanupFn = () => {
-          if (idleListenerRef.current) {
-            google.maps.event.removeListener(idleListenerRef.current);
-          }
-          polygonListenersRef.current.forEach((l) =>
-            google.maps.event.removeListener(l)
-          );
-          polygonListenersRef.current = [];
-          if (polygonRef.current) {
-            polygonRef.current.setMap(null);
-            polygonRef.current = null;
-          }
-          if (drawingManagerRef.current) {
-            drawingManagerRef.current.setMap(null);
-            drawingManagerRef.current = null;
-          }
-          if (markerRef.current) {
-            markerRef.current.setMap(null);
-            markerRef.current = null;
-          }
-          mapRef.current = null;
-        };
-      };
-
-      initMap();
+      }
 
       return () => {
-        if (cleanupFn) cleanupFn();
+        // Maps API cleanup
       };
-    }, []);
-
-    // Update center when prop changes
-    useEffect(() => {
-      if (mapRef.current) {
-        const current = mapRef.current.getCenter();
-        if (
-          current &&
-          (Math.abs(current.lat() - center.lat) > 0.001 ||
-            Math.abs(current.lng() - center.lng) > 0.001)
-        ) {
-          mapRef.current.panTo({ lat: center.lat, lng: center.lng });
-        }
-      }
-    }, [center]);
+    }, [onRegionSelect]);
 
     // DrawingManager setup and polygon drawing
     useEffect(() => {
@@ -151,7 +127,6 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
         const syncCoords = () => {
           const coords = pathToCoordinates(path);
           onPolygonChange(coords);
-          console.log('Polygon coordinates updated:', coords);
         };
         polygonListenersRef.current.push(path.addListener('insert_at', syncCoords));
         polygonListenersRef.current.push(path.addListener('set_at', syncCoords));
@@ -187,7 +162,6 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
             attachPathListeners(polygon);
             const coords = pathToCoordinates(polygon.getPath());
             onPolygonChange(coords);
-            console.log('Polygon coordinates updated:', coords);
 
             // Turn off drawing mode after completing a polygon
             onDrawingModeChange(false);
@@ -219,26 +193,57 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
       }
     }, [polygonCoordinates.length]);
 
+    // Update center if it changes externally
+    useEffect(() => {
+      if (mapRef.current) {
+        const current = mapRef.current.getCenter();
+        if (
+          current &&
+          (Math.abs(current.lat() - center.lat) > 0.001 ||
+            Math.abs(current.lng() - center.lng) > 0.001)
+        ) {
+          mapRef.current.panTo({ lat: center.lat, lng: center.lng });
+        }
+      }
+    }, [center]);
+
+    // Expose method to add marker at location and fit bounds
     useImperativeHandle(ref, () => ({
-      addMarkerAtLocation: (
-        lat: number,
-        lng: number,
-        title: string,
-        bounds: [[number, number], [number, number]]
-      ) => {
+      addMarkerAtLocation: (lat: number, lng: number, title: string, bounds: [[number, number], [number, number]]) => {
         if (!mapRef.current) return;
 
+        // Remove existing marker if present
         if (markerRef.current) {
           markerRef.current.setMap(null);
         }
 
-        const marker = new google.maps.Marker({
+        // Create marker with custom icon
+        const markerIcon = {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: '#EF2323',
+          fillOpacity: 1,
+          strokeColor: '#fff',
+          strokeWeight: 2,
+        };
+
+        markerRef.current = new google.maps.Marker({
           position: { lat, lng },
           map: mapRef.current,
-          title,
+          title: title,
+          icon: markerIcon as any,
         });
-        markerRef.current = marker;
 
+        // Create info window
+        const infoWindow = new google.maps.InfoWindow({
+          content: title,
+        });
+
+        markerRef.current.addListener('click', () => {
+          infoWindow.open(mapRef.current, markerRef.current);
+        });
+
+        // Fit map bounds to show entire location
         const sw = new google.maps.LatLng(bounds[0][0], bounds[0][1]);
         const ne = new google.maps.LatLng(bounds[1][0], bounds[1][1]);
         const boundsObj = new google.maps.LatLngBounds(sw, ne);
@@ -258,9 +263,28 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
       },
     }));
 
+    const toggleMapType = () => {
+      if (mapRef.current) {
+        const newType = mapType === 'roadmap' ? 'satellite' : 'roadmap';
+        setMapType(newType);
+        mapRef.current.setMapTypeId(newType);
+      }
+    };
+
     return (
       <div className="absolute inset-0 z-0 bg-[#ebe7e0]">
-        <div ref={containerRef} className="map-container w-full h-full" />
+        <div ref={containerRef} className="w-full h-full" />
+        {/* Satellite imagery toggle button */}
+        <button
+          onClick={toggleMapType}
+          className="absolute bottom-4 left-4 z-10 bg-white px-4 py-2 rounded-lg shadow-lg hover:shadow-xl transition-shadow flex items-center gap-2 text-gray-700 font-medium text-sm border border-gray-300 hover:bg-gray-50"
+          title="Toggle satellite imagery"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+          </svg>
+          {mapType === 'roadmap' ? 'Satellite' : 'Map'}
+        </button>
       </div>
     );
   }

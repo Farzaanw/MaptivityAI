@@ -1,7 +1,6 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Header from './components/Header';
-import MapContainer, { LatLng } from './components/MapContainer';
+import MapContainer from './components/MapContainer';
 import Sidebar from './components/Sidebar';
 import LocationSearch from './components/LocationSearch';
 import { Activity } from './types';
@@ -10,12 +9,10 @@ import { findActivities } from './services/geminiService';
 const App: React.FC = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentLocation, setCurrentLocation] = useState({ lat: 37.7749, lng: -122.4194 }); // Default SF
-  const [searchQuery, setSearchQuery] = useState("Fun things to do");
-  const [isRegionSearchOpen, setIsRegionSearchOpen] = useState(false);
-  const [regionSearchQuery, setRegionSearchQuery] = useState("");
-  const [polygonCoordinates, setPolygonCoordinates] = useState<LatLng[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [polygonCoordinates, setPolygonCoordinates] = useState<Array<{ lat: number; lng: number }>>([]);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const mapContainerRef = useRef<{ addMarkerAtLocation: (lat: number, lng: number, title: string, bounds: [[number, number], [number, number]]) => void; clearPolygon: () => void } | null>(null);
 
@@ -41,6 +38,8 @@ const App: React.FC = () => {
     if (mapContainerRef.current) {
       mapContainerRef.current.addMarkerAtLocation(lat, lng, locationName, bounds);
     }
+    // Open sidebar to show activities near the selected location
+    setIsSidebarOpen(true);
   }, []);
 
   // Function to handle search
@@ -63,7 +62,7 @@ const App: React.FC = () => {
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
   // Polygon handlers
-  const handlePolygonChange = useCallback((coords: LatLng[]) => {
+  const handlePolygonChange = useCallback((coords: Array<{ lat: number; lng: number }>) => {
     setPolygonCoordinates(coords);
   }, []);
 
@@ -105,9 +104,8 @@ const App: React.FC = () => {
 
         {/* Location Search Menu - Bottom Left */}
         <LocationSearch 
-          isOpen={isRegionSearchOpen}
-          inputValue={regionSearchQuery}
-          onInputChange={setRegionSearchQuery}
+          inputValue={searchQuery}
+          onInputChange={setSearchQuery}
           onLocationSelect={handleLocationSelect}
         />
 
@@ -135,20 +133,6 @@ const App: React.FC = () => {
               <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
             Clear Region
-          </button>
-          <button
-            onClick={() => setIsRegionSearchOpen(!isRegionSearchOpen)}
-            disabled={isLoading}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50"
-          >
-            {isLoading ? (
-              <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-              </svg>
-            )}
-            Search in new region
           </button>
         </div>
       </main>
