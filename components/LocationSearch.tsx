@@ -344,39 +344,57 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, input
               <p className="text-xs font-semibold text-gray-600">Recent Searches</p>
             </div> */}
             {searchHistory.map((item, index) => (
-              <button
+              <div
                 key={index}
-                onClick={async () => {
-                  // Reconstruct location object and select it
-                  const bounds: [[number, number], [number, number]] = [
-                    [item.lat - 0.01, item.lng - 0.01],
-                    [item.lat + 0.01, item.lng + 0.01],
-                  ];
-                  
-                  onLocationSelect(item.lat, item.lng, item.name, bounds);
-                  
-                  // Fetch image from Unsplash
-                  const imageUrl = await getLocationImage(item.name);
-                  
-                  setSelectedLocation({
-                    name: item.name,
-                    lat: item.lat,
-                    lng: item.lng,
-                    photos: imageUrl ? [imageUrl] : [],
-                    rating: null,
-                    userRatingCount: 0,
-                    address: item.address,
-                    editorialSummary: null,
-                  });
-                  
-                  onInputChange(item.name);
-                  setSuggestions([]);
-                }}
-                className="w-full text-left px-4 py-3 hover:bg-indigo-50 border-b border-gray-200 last:border-b-0 transition-colors"
+                className="flex items-center justify-between px-4 py-3 hover:bg-indigo-50 border-b border-gray-200 last:border-b-0 transition-colors group"
               >
-                <div className="font-medium text-gray-800 text-sm">{item.name}</div>
-                <div className="text-gray-500 text-xs">{item.address}</div>
-              </button>
+                <button
+                  onClick={async () => {
+                    // Reconstruct location object and select it
+                    const bounds: [[number, number], [number, number]] = [
+                      [item.lat - 0.01, item.lng - 0.01],
+                      [item.lat + 0.01, item.lng + 0.01],
+                    ];
+                    
+                    onLocationSelect(item.lat, item.lng, item.name, bounds);
+                    
+                    // Fetch image from Unsplash
+                    const imageUrl = await getLocationImage(item.name);
+                    
+                    setSelectedLocation({
+                      name: item.name,
+                      lat: item.lat,
+                      lng: item.lng,
+                      photos: imageUrl ? [imageUrl] : [],
+                      rating: null,
+                      userRatingCount: 0,
+                      address: item.address,
+                      editorialSummary: null,
+                    });
+                    
+                    onInputChange(item.name);
+                    setSuggestions([]);
+                  }}
+                  className="flex-1 text-left"
+                >
+                  <div className="font-medium text-gray-800 text-sm">{item.name}</div>
+                  <div className="text-gray-500 text-xs">{item.address}</div>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const updatedHistory = searchHistory.filter((_, i) => i !== index);
+                    setSearchHistory(updatedHistory);
+                    localStorage.setItem('maptivitySearchHistory', JSON.stringify(updatedHistory));
+                  }}
+                  className="ml-2 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                  title="Delete this location from history"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
             ))}
             {searchHistory.length > 0 && (
               <button
