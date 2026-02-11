@@ -6,13 +6,32 @@
  * When a location is selected, it centers the map and adds a marker.
  */
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 
 interface LocationSearchProps {
   onLocationSelect: (lat: number, lng: number, locationName: string, bounds: [[number, number], [number, number]]) => void;
   isOpen: boolean;
   inputValue: string;
   onInputChange: (value: string) => void;
+}
+
+interface PlaceResult {
+  place_id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  address: string;
+  rating?: number;
+  userRatingCount?: number;
+  types?: string[];
+  photos?: string[];
+}
+
+interface BoundingBox {
+  minLat: number;
+  minLng: number;
+  maxLat: number;
+  maxLng: number;
 }
 
 const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpen, inputValue, onInputChange }) => {
