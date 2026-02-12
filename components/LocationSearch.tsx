@@ -7,6 +7,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { getLocationImage } from '../services/unsplashService';
 
 interface LocationSearchProps {
   onLocationSelect: (lat: number, lng: number, locationName: string, bounds: [[number, number], [number, number]]) => void;
@@ -43,6 +44,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const [locationDetails, setLocationDetails] = useState<any>(null);
   const [searchHistory, setSearchHistory] = useState<any[]>([]);
+  const [searchRadius, setSearchRadius] = useState(2); // Default 2 km
 
   // Check if Google Maps API is loaded
   useEffect(() => {
@@ -197,8 +199,10 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
         }
       }).filter(Boolean) || [];
 
+      const displayName = place.displayName?.text || locationName;
+      
       setSelectedLocation({
-        name: place.displayName?.text || locationName,
+        name: displayName,
         lat,
         lng,
         photos: imageUrl ? [imageUrl] : photoUrls,
@@ -210,7 +214,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
 
       // Save to search history
       const newHistoryEntry = {
-        name: place.displayName?.text || locationName,
+        name: displayName,
         address: place.formattedAddress || locationName,
         lat,
         lng,
@@ -225,8 +229,9 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
       setSearchHistory(updatedHistory);
       localStorage.setItem('maptivitySearchHistory', JSON.stringify(updatedHistory));
 
+      // Update input with selected location name
+      onInputChange(displayName);
       setSuggestions([]);
-      // Keep the search text in the input bar until user hits X
 
       sessionTokenRef.current =
         new google.maps.places.AutocompleteSessionToken();
@@ -305,15 +310,10 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
                 {/* X icon - clear button */}
                 <button
                   onClick={() => {
-                    if (selectedLocation) {
-                      // If location is selected, reset everything
-                      setSelectedLocation(null);
-                      onInputChange("");
-                      setSuggestions([]);
-                    } else {
-                      // Otherwise just clear input
-                      onInputChange("");
-                    }
+                    // Clear everything and show history
+                    setSelectedLocation(null);
+                    onInputChange("");
+                    setSuggestions([]);
                   }}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
                   title="Clear"
