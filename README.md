@@ -1,135 +1,205 @@
 # Maptivity.ai (v0)
 
-Maptivity.ai is a map-first activity discovery tool.  
-Users search a location, draw a custom region on the map, and get the best activities inside that region.
+Maptivity.ai is a map-first activity discovery tool.
+Users search a location, define a circular region on the map,
+and get recommended activities inside that region.
 
-This repository contains the **v0 MVP**, focused on proving the core idea.
+This repository contains the v0 MVP, focused on proving the core idea
+with a working full-stack implementation.
 
-## What This Version Does
-- Search for a location and move the map to it
-- Draw a custom region (polygon) on the map
-- Find recommended activities inside the drawn region
-- Display results as map pins and a ranked list
+------------------------------------------------------------
+WHAT THIS VERSION DOES
+------------------------------------------------------------
+- Search for a city or location using Google Places Autocomplete
+- Move the map to the selected location
+- Define a circular search region
+- Fetch real places data from Google Places API (New)
+- Display activities as map pins and a sidebar list
 
-## What This Version Does Not Do
+------------------------------------------------------------
+WHAT THIS VERSION DOES NOT DO
+------------------------------------------------------------
 - No itinerary generation
-- No bookings or tickets
+- No bookings or ticket integrations
 - No accounts or authentication
 - No reviews or social features
+- No AI-based ranking (yet)
 
-## Core Idea
-Instead of browsing endless lists, users define **where they are willing to go** directly on the map and see what’s worth doing there.
+------------------------------------------------------------
+CORE IDEA
+------------------------------------------------------------
+Instead of browsing endless lists, users define where they are
+willing to go directly on the map and see what’s worth doing there.
 
-## How Recommendations Work
-Activities are ranked using a deterministic algorithm:
-- Only activities inside the drawn region are considered
-- Activities are scored by popularity and relevance
-- Top activities are returned and displayed
+The map is the primary interface — not a search results page.
 
-LLMs are not used to decide recommendations in v0.
+------------------------------------------------------------
+HOW RECOMMENDATIONS WORK (v0)
+------------------------------------------------------------
+- Only places inside the defined circular region are queried
+- A fixed set of supported activity types is used
+- Results are normalized and displayed
+- No ML or LLM ranking is used in v0
 
-## Tech Stack
-**Frontend**
-- Next.js + TypeScript
-- Mapbox GL JS + Mapbox Draw
+------------------------------------------------------------
+TECH STACK
+------------------------------------------------------------
+
+Frontend:
+- React + TypeScript
+- Vite
+- Google Maps JavaScript API
 - Tailwind CSS
 
-**Backend**
-- FastAPI or Node.js
-- External Places/POI API (single provider)
+Backend:
+- Node.js
+- Express
+- Google Places API (New)
 
-## Status
-Early MVP — under active development.
+------------------------------------------------------------
+PREREQUISITES
+------------------------------------------------------------
+- Node.js (recommended v18+)
+- npm
+- A Google Cloud project with billing enabled
 
+------------------------------------------------------------
+SETUP
+------------------------------------------------------------
 
-### Prereqs
-- Node.js (recommended: v18+)
-- npm (comes with Node)
+1) Clone the repo
 
-# Maptivity.ai (v0)
-
-Maptivity.ai is a map-first activity discovery tool.  
-Users search a location, draw a custom region on the map, and get the best activities inside that region.
-
-This repository contains the **v0 MVP**, focused on proving the core idea.
-
-## What This Version Does
-- Search for a location and move the map to it
-- Draw a custom region (polygon) on the map
-- Find recommended activities inside the drawn region
-- Display results as map pins and a ranked list
-
-## What This Version Does Not Do
-- No itinerary generation
-- No bookings or tickets
-- No accounts or authentication
-- No reviews or social features
-
-## Core Idea
-Instead of browsing endless lists, users define **where they are willing to go** directly on the map and see what’s worth doing there.
-
-## How Recommendations Work
-Activities are ranked using a deterministic algorithm:
-- Only activities inside the drawn region are considered
-- Activities are scored by popularity and relevance
-- Top activities are returned and displayed
-
-LLMs are not used to decide recommendations in v0.
-
-## Tech Stack
-**Frontend**
-- Next.js + TypeScript
-- Mapbox GL JS + Mapbox Draw
-- Tailwind CSS
-
-**Backend**
-- FastAPI or Node.js
-- External Places/POI API (single provider)
-
-## Status
-Early MVP — under active development.
-
-
-### Prereqs
-- Node.js (recommended: v18+)
-- npm (comes with Node)
-
-## Setup
-
-```bash
-### 1. Clone the repo:
 git clone <REPO_URL>
 cd MaptivityAI
 
-### 2. Install dependencies
+2) Install frontend dependencies
+
 npm install
 
---- For Local Development ---
-### 3. Google Maps Setup
+3) Install backend dependencies
 
-This project requires a Google Maps API key with the following APIs enabled:
+cd server
+npm install
+cd ..
+
+------------------------------------------------------------
+GOOGLE API SETUP (REQUIRED)
+------------------------------------------------------------
+
+You must create TWO separate API keys.
+
+------------------------------------------------------------
+1) FRONTEND KEY (Browser Key)
+------------------------------------------------------------
+
+Used for:
+- Maps JavaScript API
+- Places Autocomplete
+
+Steps:
+1. Go to Google Cloud Console
+2. APIs & Services -> Credentials
+3. Create Credentials -> API Key
+4. Rename to: Maptivity Frontend Key
+
+Application restrictions:
+Select "Websites (HTTP referrers)"
+Add:
+http://localhost:3000/*
+
+API restrictions:
+Restrict key to:
 - Maps JavaScript API
 - Places API (New)
-- Optional: Geocoding API (used as fallback)
 
-Create `.env` file in project root and add:
-```
-VITE_GOOGLE_MAPS_API_KEY=your_api_key_here
-```
+Add to root .env file:
 
-### 4. Unsplash API Setup
+Create file in project root:
+.env
 
-The app fetches location images from Unsplash. The API key is embedded in the code but should be moved to environment variables for security:
+Add:
+VITE_GOOGLE_MAPS_API_KEY=AIzaSyYOUR_FRONTEND_KEY
 
-1. Get free API key at https://unsplash.com/developers
-2. Update `services/unsplashService.ts` to use environment variable:
-```
-const UNSPLASH_API_KEY = import.meta.env.VITE_UNSPLASH_API_KEY;
-```
-3. Add to `.env`:
-```
-VITE_UNSPLASH_API_KEY=your_unsplash_api_key_here
-```
+------------------------------------------------------------
+2) BACKEND KEY (Server Key)
+------------------------------------------------------------
 
-### 5. Start App
-npm run dev
+Used for:
+- Places API (New) HTTP requests
+
+Steps:
+1. Google Cloud Console -> Credentials
+2. Create Credentials -> API Key
+3. Rename to: Maptivity Backend Key
+
+Application restrictions:
+None (for local development)
+
+API restrictions:
+Restrict key to:
+- Places API (New)
+
+Add to server/.env:
+
+Create:
+server/.env
+
+Add:
+GOOGLE_PLACES_API_KEY=AIzaSyYOUR_BACKEND_KEY
+PORT=5050
+
+IMPORTANT:
+- Do NOT prefix backend key with VITE_
+- Never expose backend key in frontend code
+
+------------------------------------------------------------
+BILLING
+------------------------------------------------------------
+Google Places API requires billing enabled.
+
+In Google Cloud Console:
+- Ensure project is linked to active billing account
+- Ensure Places API (New) is enabled
+
+------------------------------------------------------------
+RUN LOCALLY
+------------------------------------------------------------
+
+From project root:
+
+npm run dev:all
+
+This starts:
+Frontend: http://localhost:3000
+Backend:  http://localhost:5050
+
+------------------------------------------------------------
+TROUBLESHOOTING
+------------------------------------------------------------
+
+API_KEY_INVALID:
+- Confirm backend key is inside server/.env
+- Confirm it starts with AIza
+- Confirm Places API (New) is enabled
+- Restart server after changes
+
+Port 5050 already in use:
+taskkill /F /IM node.exe
+Then restart:
+npm run dev:all
+
+------------------------------------------------------------
+STATUS
+------------------------------------------------------------
+Working full-stack MVP.
+Backend integrated.
+Under active development.
+
+------------------------------------------------------------
+ROADMAP
+------------------------------------------------------------
+- Deterministic ranking algorithm
+- Polygon-based filtering
+- Advanced map markers
+- Caching layer
+- Deployment
