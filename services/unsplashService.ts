@@ -3,10 +3,15 @@
  * Fetches location images from Unsplash API
  */
 
-const UNSPLASH_API_KEY = '-CDk0WUlDQhc3EEBpBSdAsbFvHKHrwBZ1Wyrs93Pzfg';
+const UNSPLASH_API_KEY = (import.meta as any).env.VITE_UNSPLASH_API_KEY;
 const UNSPLASH_API_URL = 'https://api.unsplash.com';
 
 export const getLocationImage = async (locationName: string): Promise<string | null> => {
+  if (!UNSPLASH_API_KEY) {
+    console.warn('Unsplash API key not configured. Set VITE_UNSPLASH_API_KEY in .env.local');
+    return null;
+  }
+
   try {
     const response = await fetch(
       `${UNSPLASH_API_URL}/search/photos?query=${encodeURIComponent(locationName)}&per_page=1&client_id=${UNSPLASH_API_KEY}`
