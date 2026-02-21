@@ -121,6 +121,20 @@ Add:
 VITE_GOOGLE_MAPS_API_KEY=AIzaSyYOUR_FRONTEND_KEY
 
 ------------------------------------------------------------
+1b) Optional KEY (allows for location search images to show)
+------------------------------------------------------------
+
+a. Get free API key at https://unsplash.com/developers
+
+b. Add to `.env`:
+```
+VITE_UNSPLASH_API_KEY=your_unsplash_api_key_here
+```
+
+- The app now can fetche location images from Unsplash Key
+
+
+------------------------------------------------------------
 2) BACKEND KEY (Server Key)
 ------------------------------------------------------------
 
