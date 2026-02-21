@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:server": "cd server && npm run dev",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\""
   },
   "dependencies": {
     "@google/genai": "^1.39.0",
@@ -14,6 +16,7 @@
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
+    "concurrently": "^9.1.0",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/google.maps": "^3.58.1",
     "@types/node": "^22.14.0",

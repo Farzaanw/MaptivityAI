@@ -16,11 +16,10 @@ interface MapContainerProps {
   onPolygonChange: (coords: LatLng[]) => void;
   isDrawingMode: boolean;
   onDrawingModeChange: (enabled: boolean) => void;
-  isPlacementMode: boolean;
+  isAreaSelectionMode: boolean;
   onMapClickForPlacement: (lat: number, lng: number) => void;
   startTickerLocation: { lat: number; lng: number } | null;
   onRadiusChange?: (radiusMeters: number) => void;
-  isDragRegionMode: boolean;
 }
 
 interface MapContainerHandle {
@@ -28,6 +27,8 @@ interface MapContainerHandle {
   clearPolygon: () => void;
   setMapClickMode: (enabled: boolean) => void;
   panToLocation: (lat: number, lng: number) => void;
+  getCircle: () => { center: LatLng; radiusMeters: number } | null;
+  clearSearchCircle: () => void;
 }
 
 function pathToCoordinates(path: google.maps.MVCArray<google.maps.LatLng>): LatLng[] {
@@ -40,7 +41,7 @@ function pathToCoordinates(path: google.maps.MVCArray<google.maps.LatLng>): LatL
 }
 
 const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
-  ({ onRegionSelect, center, polygonCoordinates, onPolygonChange, isDrawingMode, onDrawingModeChange, isPlacementMode, onMapClickForPlacement, startTickerLocation, onRadiusChange, isDragRegionMode }, ref) => {
+  ({ onRegionSelect, center, polygonCoordinates, onPolygonChange, isDrawingMode, onDrawingModeChange, isAreaSelectionMode, onMapClickForPlacement, startTickerLocation, onRadiusChange }, ref) => {
     const mapRef = useRef<google.maps.Map | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const markerRef = useRef<google.maps.Marker | null>(null);
@@ -200,11 +201,11 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
       };
     }, [isDrawingMode, onPolygonChange, onDrawingModeChange]);
 
-    // Placement mode effect - listen for map clicks to place marker
+    // Area selection mode - listen for map clicks to place marker
     useEffect(() => {
       if (!mapRef.current) return;
 
-      if (isPlacementMode) {
+      if (isAreaSelectionMode) {
         // Change cursor to crosshair
         mapRef.current.setOptions({ draggableCursor: 'crosshair' });
 
@@ -231,7 +232,7 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
           mapClickListenerRef.current = null;
         }
       };
-    }, [isPlacementMode, onMapClickForPlacement]);
+    }, [isAreaSelectionMode, onMapClickForPlacement]);
 
     // Search circle effect - create/update circle when startTickerLocation changes
     useEffect(() => {
@@ -248,8 +249,8 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
         return;
       }
 
-      // Hide circle during placement mode, show it when confirmed
-      if (isPlacementMode) {
+      // Hide circle during area selection placement, show when center is placed
+      if (isAreaSelectionMode && !startTickerLocation) {
         if (searchCircleRef.current) {
           searchCircleRef.current.setMap(null);
         }
@@ -278,8 +279,7 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
           onRadiusChange?.(newRadius);
         });
       } else {
-        // Update circle center and make it visible
-        searchCircleRef.current.setCenter({ lat: startTickerLocation.lat, lng: startTickerLocation.lng });
+        // Circle already exists (user may have dragged it) - only ensure it's visible; do NOT reset center
         searchCircleRef.current.setMap(mapRef.current);
       }
 
@@ -289,11 +289,11 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
           circleListenerRef.current = null;
         }
       };
-    }, [startTickerLocation, isPlacementMode, onRadiusChange]);
+    }, [startTickerLocation, isAreaSelectionMode, onRadiusChange]);
 
-    // Arrow indicators effect - show on hover at diagonal corners
+    // Arrow indicators effect - show on hover when circle is editable
     useEffect(() => {
-      if (!mapRef.current || !searchCircleRef.current || isPlacementMode) {
+      if (!mapRef.current || !searchCircleRef.current || !startTickerLocation || !isAreaSelectionMode) {
         // Remove arrows when not needed
         circleArrowMarkersRef.current.forEach(marker => marker.setMap(null));
         circleArrowMarkersRef.current = [];
@@ -393,66 +393,27 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
         circleArrowMarkersRef.current.forEach(marker => marker.setMap(null));
         circleArrowMarkersRef.current = [];
       };
-    }, [isPlacementMode]);
+    }, [isAreaSelectionMode, startTickerLocation]);
 
-    // Drag region mode effect - lock map, enable circle dragging, pan with circle
+    // Area selection mode: when circle exists, enable circle dragging
     useEffect(() => {
       if (!mapRef.current || !searchCircleRef.current || !startTickerLocation) return;
 
-      if (isDragRegionMode) {
-        // Lock map - disable dragging and panning
-        mapRef.current.setOptions({ 
-          draggable: false,
-          zoomControl: false,
-          scrollwheel: false,
-          doubleClickZoom: false,
-          draggableCursor: 'grab',
-        });
-        
-        // Enable circle dragging
-        searchCircleRef.current.setOptions({ draggable: true });
-
-        // Pan map as circle center changes, with snap-to behavior near start ticker
-        circleCenterChangeListenerRef.current = searchCircleRef.current.addListener('center_changed', () => {
-          const newCenter = searchCircleRef.current?.getCenter();
-          if (newCenter && mapRef.current) {
-            // Calculate distance between circle center and start ticker
-            const distanceInMeters = google.maps.geometry.spherical.computeDistanceBetween(
-              new google.maps.LatLng(newCenter.lat(), newCenter.lng()),
-              new google.maps.LatLng(startTickerLocation.lat, startTickerLocation.lng)
-            );
-
-            // If within 150 meters of start ticker, snap to it for easier alignment
-            if (distanceInMeters < 150 && !isSnappingRef.current) {
-              isSnappingRef.current = true;
-              searchCircleRef.current.setCenter(new google.maps.LatLng(startTickerLocation.lat, startTickerLocation.lng));
-              // Reset flag after a short delay to prevent re-triggering
-              setTimeout(() => {
-                isSnappingRef.current = false;
-              }, 100);
-              return;
-            }
-
-            mapRef.current.panTo(newCenter);
-          }
-        });
-      } else {
-        // Remove center change listener when exiting drag mode
-        if (circleCenterChangeListenerRef.current) {
-          google.maps.event.removeListener(circleCenterChangeListenerRef.current);
-          circleCenterChangeListenerRef.current = null;
-        }
-
-        // Unlock map - enable dragging and panning
-        mapRef.current.setOptions({ 
+      if (isAreaSelectionMode) {
+        // Keep map zoomable and pannable; only make circle draggable
+        mapRef.current.setOptions({
           draggable: true,
-          zoomControl: false,
           scrollwheel: true,
           doubleClickZoom: true,
           draggableCursor: 'grab',
         });
-        
-        // Disable circle center dragging (only edge resize allowed)
+        searchCircleRef.current.setOptions({ draggable: true });
+      } else {
+        if (circleCenterChangeListenerRef.current) {
+          google.maps.event.removeListener(circleCenterChangeListenerRef.current);
+          circleCenterChangeListenerRef.current = null;
+        }
+        // Keep map zoomable/pannable; circle stays where user left it (no center reset)
         searchCircleRef.current.setOptions({ draggable: false });
       }
 
@@ -462,11 +423,11 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
           circleCenterChangeListenerRef.current = null;
         }
       };
-    }, [isDragRegionMode, startTickerLocation]);
+    }, [isAreaSelectionMode, startTickerLocation]);
 
     // Connection line effect - draw dotted line from start ticker to circle center
     useEffect(() => {
-      if (!mapRef.current || !startTickerLocation || isPlacementMode || !searchCircleRef.current) {
+      if (!mapRef.current || !startTickerLocation || !searchCircleRef.current) {
         // Remove connection line if conditions not met
         if (connectionLineRef.current) {
           if (connectionLineListenerRef.current) {
@@ -518,7 +479,7 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
           connectionLineListenerRef.current = null;
         }
       };
-    }, [startTickerLocation, isPlacementMode]);
+    }, [startTickerLocation, isAreaSelectionMode]);
 
     // Clear polygon when coordinates become empty (external clear)
     useEffect(() => {
@@ -643,9 +604,48 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
         }
         onPolygonChange([]);
       },
-      setMapClickMode: (enabled: boolean) => {
-        // This is handled by the useEffect that monitors isPlacementMode
-        // This method is just here for API completeness
+      setMapClickMode: () => {},
+      getCircle: (): { center: LatLng; radiusMeters: number } | null => {
+        if (!searchCircleRef.current || !startTickerLocation) return null;
+        const center = searchCircleRef.current.getCenter();
+        const radius = searchCircleRef.current.getRadius();
+        if (!center) return null;
+        return {
+          center: { lat: center.lat(), lng: center.lng() },
+          radiusMeters: radius ?? 2000,
+        };
+      },
+      clearSearchCircle: () => {
+        if (markerRef.current) {
+          markerRef.current.setMap(null);
+          markerRef.current = null;
+        }
+        if (pinOverlayRef.current) {
+          pinOverlayRef.current.setMap(null);
+          pinOverlayRef.current = null;
+        }
+        if (searchCircleRef.current) {
+          if (circleListenerRef.current) {
+            google.maps.event.removeListener(circleListenerRef.current);
+            circleListenerRef.current = null;
+          }
+          circleArrowMarkersRef.current.forEach((m) => m.setMap(null));
+          circleArrowMarkersRef.current = [];
+          if (connectionLineRef.current) {
+            if (connectionLineListenerRef.current) {
+              google.maps.event.removeListener(connectionLineListenerRef.current);
+              connectionLineListenerRef.current = null;
+            }
+            connectionLineRef.current.setMap(null);
+            connectionLineRef.current = null;
+          }
+          if (circleCenterChangeListenerRef.current) {
+            google.maps.event.removeListener(circleCenterChangeListenerRef.current);
+            circleCenterChangeListenerRef.current = null;
+          }
+          searchCircleRef.current.setMap(null);
+          searchCircleRef.current = null;
+        }
       },
       panToLocation: (lat: number, lng: number) => {
         if (mapRef.current) {
