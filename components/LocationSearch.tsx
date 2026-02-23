@@ -11,8 +11,11 @@ import { getLocationImage } from '../services/unsplashService';
 
 interface LocationSearchProps {
   onLocationSelect: (lat: number, lng: number, locationName: string, bounds: [[number, number], [number, number]]) => void;
+  onSetAsStartLocation: (lat: number, lng: number, locationName: string) => void;
   inputValue: string;
   onInputChange: (value: string) => void;
+  isMinimized: boolean;
+  onMinimizedChange: (minimized: boolean) => void;
 }
 
 interface PlaceResult {
@@ -34,13 +37,12 @@ interface BoundingBox {
   maxLng: number;
 }
 
-const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpen, inputValue, onInputChange }) => {
+const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, onSetAsStartLocation, inputValue, onInputChange, isMinimized, onMinimizedChange }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const sessionTokenRef = useRef<any>(null);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const [locationDetails, setLocationDetails] = useState<any>(null);
   const [searchHistory, setSearchHistory] = useState<any[]>([]);
@@ -254,13 +256,13 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
     >
       <div 
         className="flex justify-between items-center cursor-pointer"
-        onClick={() => isMinimized && setIsMinimized(false)}
+        onClick={() => isMinimized && onMinimizedChange(false)}
       >
         <h2 className="text-lg font-bold text-gray-800">Search Location</h2>
         <button
           onClick={(e) => {
             e.stopPropagation();
-            setIsMinimized(!isMinimized);
+            onMinimizedChange(!isMinimized);
           }}
           className="text-gray-500 hover:text-gray-700 transition-colors"
           title={isMinimized ? 'Expand' : 'Minimize'}
@@ -480,7 +482,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
 
           {/* Additional Details */}
           {selectedLocation.rating && (
-            <div className="px-4 py-4">
+            <div className="px-4 py-4 border-b border-gray-200">
               <div className="flex items-center gap-2">
                 <div className="flex">
                   {[...Array(5)].map((_, i) => (
@@ -501,6 +503,20 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, isOpe
               </div>
             </div>
           )}
+
+          {/* Set as Start Location Button */}
+          <div className="px-4 py-4">
+            <button
+              onClick={() => {
+                onSetAsStartLocation(selectedLocation.lat, selectedLocation.lng, selectedLocation.name);
+                onMinimizedChange(true);
+              }}
+              className="w-full px-4 py-3 bg-red-400 hover:bg-red-500 text-white font-semibold rounded-lg transform hover:scale-105 active:scale-95 transition-all shadow-md"
+              title="Set this location as your search start point and begin finding activities"
+            >
+              Set as Start Location
+            </button>
+          </div>
         </div>
       )}
     </div>

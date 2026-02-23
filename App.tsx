@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isLocationSearchMinimized, setIsLocationSearchMinimized] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentLocation, setCurrentLocation] = useState<LatLng>({ lat: 37.7749, lng: -122.4194 });
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,11 +51,32 @@ const App: React.FC = () => {
 
   const handleLocationSelect = useCallback(
     (lat: number, lng: number, locationName: string, bounds: [[number, number], [number, number]]) => {
+      // Just pan to the location, don't place a marker
       setCurrentLocation({ lat, lng });
       if (mapContainerRef.current) {
-        mapContainerRef.current.addMarkerAtLocation(lat, lng, locationName, bounds);
+        mapContainerRef.current.panToLocation(lat, lng);
       }
-      // Do NOT fetch activities or open sidebar for activities
+    },
+    []
+  );
+
+  const handleSetAsStartLocation = useCallback(
+    (lat: number, lng: number, locationName: string) => {
+      // Clear all previous selections
+      mapContainerRef.current?.clearSearchCircle();
+      setCircle(null);
+      setActivities([]);
+      
+      // Set new start location and enter area selection mode
+      setStartTickerLocation({ lat, lng });
+      setIsAreaSelectionMode(true);
+      
+      // Place the ticker symbol on the map
+      mapContainerRef.current?.addMarkerAtLocation(lat, lng, locationName, [[lat - 0.01, lng - 0.01], [lat + 0.01, lng + 0.01]]);
+      
+      // Minimize both sidebars
+      setIsSidebarOpen(false);
+      setIsLocationSearchMinimized(true);
     },
     []
   );
@@ -114,18 +136,17 @@ const App: React.FC = () => {
   }, []);
 
   const handleSetSearchAreaClick = useCallback(async () => {
-    if (hasSearchArea && !isAreaSelectionMode) {
-      mapContainerRef.current?.clearSearchCircle();
-      setStartTickerLocation(null);
-      setCircle(null);
-      setActivities([]);
+    // Screen 1: No start location → enter area selection mode (Screen 2)
+    if (!startTickerLocation) {
       setIsAreaSelectionMode(true);
-    } else if (isAreaSelectionMode) {
+    }
+    // Screen 2: Start location + in area selection mode → search activities (Screen 3)
+    else if (startTickerLocation && isAreaSelectionMode) {
       const circleData = mapContainerRef.current?.getCircle();
       if (circleData) {
         setCircle(circleData);
         setIsAreaSelectionMode(false);
-        const query = searchQuery || 'things to do';
+        const query = searchQuery || 'Enter location...';
         setSearchQuery(query);
         setIsSidebarOpen(true);
         setIsLoading(true);
@@ -146,10 +167,23 @@ const App: React.FC = () => {
           setIsLoading(false);
         }
       }
-    } else {
+    }
+    // Screen 3: Circle exists + NOT in area selection mode → enter move mode (back to Screen 2)
+    else if (hasSearchArea && !isAreaSelectionMode) {
       setIsAreaSelectionMode(true);
     }
-  }, [hasSearchArea, isAreaSelectionMode, searchQuery]);
+  }, [startTickerLocation, isAreaSelectionMode, searchQuery, hasSearchArea]);
+
+  const handleReset = useCallback(() => {
+    // Reset everything back to Screen 1
+    mapContainerRef.current?.clearSearchCircle();
+    setStartTickerLocation(null);
+    setCircle(null);
+    setActivities([]);
+    setIsAreaSelectionMode(false);
+    setSearchQuery('things to do');
+    setIsSidebarOpen(false);
+  }, []);
 
   return (
     <div className="relative h-screen w-full flex flex-col overflow-hidden font-sans">
@@ -184,9 +218,13 @@ const App: React.FC = () => {
           inputValue={searchQuery}
           onInputChange={setSearchQuery}
           onLocationSelect={handleLocationSelect}
+          onSetAsStartLocation={handleSetAsStartLocation}
+          isMinimized={isLocationSearchMinimized}
+          onMinimizedChange={setIsLocationSearchMinimized}
         />
 
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20 flex gap-3">
+          {/* Show "Back to Start" on screens 2 and 3 */}
           {startTickerLocation && (
             <button
               onClick={() => {
@@ -208,13 +246,15 @@ const App: React.FC = () => {
               Back to Start
             </button>
           )}
+
+          {/* Main action button */}
           <button
             onClick={handleSetSearchAreaClick}
             disabled={isAreaSelectionMode && !startTickerLocation}
             className={`px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 transform hover:scale-105 active:scale-95 transition-colors disabled:opacity-70 disabled:cursor-not-allowed ${
               hasSearchArea && !isAreaSelectionMode
                 ? 'bg-slate-600 hover:bg-slate-700 text-white'
-                : isAreaSelectionMode && startTickerLocation
+                : startTickerLocation && isAreaSelectionMode
                   ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
                   : isAreaSelectionMode
                     ? 'bg-indigo-500 hover:bg-indigo-600 text-white'
@@ -234,11 +274,34 @@ const App: React.FC = () => {
               />
             </svg>
             {hasSearchArea && !isAreaSelectionMode
-              ? 'Change Area'
-              : isAreaSelectionMode && startTickerLocation
+              ? 'Move Region'
+              : startTickerLocation && isAreaSelectionMode
                 ? 'Search This Area'
                 : 'Set Search Area'}
           </button>
+
+          {/* Screen 3: Show "Clear" button when circle exists and not in area selection mode */}
+          {hasSearchArea && !isAreaSelectionMode && (
+            <button
+              onClick={handleReset}
+              className="px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 transform hover:scale-105 active:scale-95 transition-colors bg-red-400 hover:bg-red-500 text-white"
+              title="Start over with a new location"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              Clear
+            </button>
+          )}
         </div>
       </main>
     </div>

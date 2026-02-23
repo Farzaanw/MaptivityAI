@@ -106,6 +106,75 @@ app.get('/api/places/nearby', async (req, res) => {
       return res.status(response.status).json({ error: err || 'Places API error' });
     }
     data = (await response.json()) as { places?: Array<Record<string, unknown>> };
+
+    // Filter out administrative areas (cities, states, countries) - they clutter results
+    const places = (data.places ?? []) as Array<Record<string, unknown>>;
+    const filtered = places.filter((p) => {
+      const types = (p.types as string[]) ?? [];
+      // Exclude if it's only administrative/political/locality types with no real activity types
+      const hasActivityType = types.some(
+        (t) =>
+          ![
+            'locality',
+            'political',
+            'country',
+            'administrative_area_level_1',
+            'administrative_area_level_2',
+          ].includes(t)
+      );
+      return hasActivityType || types.length === 0;
+    });
+
+    console.log(`[searchText] Got ${places.length} places, filtered to ${filtered.length} after removing admin areas`);
+    data.places = filtered;
+
+    // If searchText returns no activity results, fall back to searchNearby
+    if (filtered.length === 0) {
+      console.log(`[searchText] No activity results for "${q}", falling back to searchNearby`);
+      const fallbackResponse = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          includedTypes: [
+            'amusement_park',
+            'aquarium',
+            'art_gallery',
+            'bakery',
+            'bar',
+            'beach',
+            'beauty_salon',
+            'bowling_alley',
+            'cafe',
+            'casino',
+            'church',
+            'garden',
+            'golf_course',
+            'gym',
+            'hotel',
+            'ice_cream_shop',
+            'lake',
+            'library',
+            'movie_theater',
+            'museum',
+            'park',
+            'restaurant',
+            'shopping_mall',
+            'spa',
+            'stadium',
+            'tourist_attraction',
+            'zoo',
+          ],
+          maxResultCount: 20,
+          locationRestriction: { circle },
+        }),
+      });
+      if (!fallbackResponse.ok) {
+        const err = await fallbackResponse.text();
+        console.error('[searchNearby fallback] Places API error:', fallbackResponse.status, err);
+        return res.status(fallbackResponse.status).json({ error: err || 'Places API error' });
+      }
+      data = (await fallbackResponse.json()) as { places?: Array<Record<string, unknown>> };
+    }
   } else {
     const response = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
       method: 'POST',
@@ -134,7 +203,6 @@ app.get('/api/places/nearby', async (req, res) => {
           'museum',
           'park',
           'restaurant',
-          'school',
           'shopping_mall',
           'spa',
           'stadium',

@@ -45,7 +45,18 @@ export async function searchNearbyActivities(params: {
     if (!res.ok) throw new Error(`Places API error: ${res.status}`);
     const data = (await res.json()) as NearbyResponse;
     const places = data.places ?? [];
-    return places.map((p) => ({
+    
+    // Deduplicate by ID to avoid showing the same place twice
+    const seenIds = new Set<string>();
+    const deduplicated = places.filter((p) => {
+      if (seenIds.has(p.id)) {
+        return false;
+      }
+      seenIds.add(p.id);
+      return true;
+    });
+
+    return deduplicated.map((p) => ({
       id: p.id,
       title: p.name,
       description: p.address ?? '',

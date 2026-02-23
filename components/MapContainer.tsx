@@ -240,7 +240,8 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
     useEffect(() => {
       if (!mapRef.current) return;
 
-      if (isAreaSelectionMode) {
+      // Only allow map clicks if in area selection mode AND no start location yet
+      if (isAreaSelectionMode && !startTickerLocation) {
         // Change cursor to crosshair
         mapRef.current.setOptions({ draggableCursor: 'crosshair' });
 
@@ -267,7 +268,7 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
           mapClickListenerRef.current = null;
         }
       };
-    }, [isAreaSelectionMode, onMapClickForPlacement]);
+    }, [isAreaSelectionMode, onMapClickForPlacement, startTickerLocation]);
 
     // Search circle effect - create/update circle when startTickerLocation changes
     useEffect(() => {
@@ -308,66 +309,39 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
           draggable: false, // Disable center dragging to avoid conflicts
         });
 
-        // Create animated pulsing glow effect
-        let pulseDirection = 1;
-        let pulseOpacity = 0.3;
-        const pulseInterval = setInterval(() => {
-          pulseOpacity += pulseDirection * 0.05;
-          if (pulseOpacity >= 0.8) pulseDirection = -1;
-          if (pulseOpacity <= 0.3) pulseDirection = 1;
-          
-          searchCircleRef.current?.setOptions({
-            strokeOpacity: pulseOpacity,
-            strokeWeight: 10 + (pulseOpacity - 0.3) * 10,
-          });
-        }, 120);
-
-        // Stop pulsing after 7 seconds
-        setTimeout(() => {
-          clearInterval(pulseInterval);
-          searchCircleRef.current?.setOptions({
-            strokeOpacity: 0.5,
-            strokeWeight: 10,
-          });
-        }, 7000);
-
-        // Create animated handles at N, E, S, W positions
-        const center = searchCircleRef.current.getCenter();
-        const radius = searchCircleRef.current.getRadius();
-        const handlePositions = [
-          { lat: center.lat() + (radius / 111000), lng: center.lng(), label: 'N' }, // North
-          { lat: center.lat() - (radius / 111000), lng: center.lng(), label: 'S' }, // South
-          { lat: center.lat(), lng: center.lng() + (radius / (111000 * Math.cos(center.lat() * Math.PI / 180))), label: 'E' }, // East
-          { lat: center.lat(), lng: center.lng() - (radius / (111000 * Math.cos(center.lat() * Math.PI / 180))), label: 'W' }, // West
-        ];
-
-        const handleMarkers = handlePositions.map(pos => {
-          const marker = new google.maps.Marker({
-            position: pos,
-            map: mapRef.current,
-            title: 'Drag to adjust',
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 8,
-              fillColor: '#1E40AF',
-              fillOpacity: 0.7,
-              strokeColor: '#FFFFFF',
-              strokeWeight: 2,
-            },
-          });
-          return marker;
-        });
-
-        // Auto-remove handles after 7 seconds
-        setTimeout(() => {
-          handleMarkers.forEach(marker => marker.setMap(null));
-        }, 7000);
-
         // Listen for radius changes (when user drags circle edge)
         circleListenerRef.current = searchCircleRef.current.addListener('radius_changed', () => {
           const newRadius = searchCircleRef.current?.getRadius() || 2000;
           onRadiusChange?.(newRadius);
         });
+
+        // Create connection line from start ticker to circle center
+        if (!connectionLineRef.current) {
+          const circleCenter = searchCircleRef.current.getCenter();
+          connectionLineRef.current = new google.maps.Polyline({
+            path: [startTickerLocation, { lat: circleCenter.lat(), lng: circleCenter.lng() }],
+            geodesic: true,
+            strokeColor: '#cc6c6c',
+            strokeOpacity: 0,
+            strokeWeight: 2,
+            icons: [
+              {
+                icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
+                offset: '0',
+                repeat: '25px',
+              },
+            ],
+            map: mapRef.current,
+          });
+
+          // Update line when circle center changes
+          connectionLineListenerRef.current = searchCircleRef.current.addListener('center_changed', () => {
+            const newCenter = searchCircleRef.current?.getCenter();
+            if (newCenter && connectionLineRef.current) {
+              connectionLineRef.current.setPath([startTickerLocation, { lat: newCenter.lat(), lng: newCenter.lng() }]);
+            }
+          });
+        }
       } else {
         // Circle already exists (user may have dragged it) - only ensure it's visible; do NOT reset center
         searchCircleRef.current.setMap(mapRef.current);
@@ -466,18 +440,31 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
         circleArrowMarkersRef.current.forEach(marker => marker.setVisible(true));
       });
 
-      // Hide arrows when mouse leaves
-      const mouseoutListener = searchCircleRef.current.addListener('mouseout', () => {
+      // Hide arrows when mouse leaves (but keep visible during drag)
+      let isDragging = false;
+      const mousedownListener = searchCircleRef.current.addListener('mousedown', () => {
+        isDragging = true;
+      });
+      const mouseupListener = searchCircleRef.current.addListener('mouseup', () => {
+        isDragging = false;
         circleArrowMarkersRef.current.forEach(marker => marker.setVisible(false));
       });
 
-      // Update arrows when circle changes
+      const mouseoutListener = searchCircleRef.current.addListener('mouseout', () => {
+        if (!isDragging) {
+          circleArrowMarkersRef.current.forEach(marker => marker.setVisible(false));
+        }
+      });
+
+      // Update arrows when circle changes (important during dragging)
       const radiusChangedListener = searchCircleRef.current.addListener('radius_changed', createArrowMarkers);
       const centerChangedListener = searchCircleRef.current.addListener('center_changed', createArrowMarkers);
 
       return () => {
         if (mouseoverListener) google.maps.event.removeListener(mouseoverListener);
         if (mouseoutListener) google.maps.event.removeListener(mouseoutListener);
+        if (mousedownListener) google.maps.event.removeListener(mousedownListener);
+        if (mouseupListener) google.maps.event.removeListener(mouseupListener);
         if (radiusChangedListener) google.maps.event.removeListener(radiusChangedListener);
         if (centerChangedListener) google.maps.event.removeListener(centerChangedListener);
         circleArrowMarkersRef.current.forEach(marker => marker.setMap(null));
@@ -515,61 +502,8 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
       };
     }, [isAreaSelectionMode, startTickerLocation]);
 
-    // Connection line effect - draw dotted line from start ticker to circle center
-    useEffect(() => {
-      if (!mapRef.current || !startTickerLocation || !searchCircleRef.current) {
-        // Remove connection line if conditions not met
-        if (connectionLineRef.current) {
-          if (connectionLineListenerRef.current) {
-            google.maps.event.removeListener(connectionLineListenerRef.current);
-            connectionLineListenerRef.current = null;
-          }
-          connectionLineRef.current.setMap(null);
-          connectionLineRef.current = null;
-        }
-        return;
-      }
-
-      const circleCenter = searchCircleRef.current.getCenter();
-      if (!circleCenter) return;
-
-      // Create or update connection line
-      if (!connectionLineRef.current) {
-        connectionLineRef.current = new google.maps.Polyline({
-          path: [startTickerLocation, { lat: circleCenter.lat(), lng: circleCenter.lng() }],
-          geodesic: true,
-          strokeColor: '#cc6c6c',
-          strokeOpacity: 0,
-          strokeWeight: 2,
-          icons: [
-            {
-              icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
-              offset: '0',
-              repeat: '25px',
-            },
-          ],
-          map: mapRef.current,
-        });
-
-        // Update line when circle center changes
-        connectionLineListenerRef.current = searchCircleRef.current.addListener('center_changed', () => {
-          const newCenter = searchCircleRef.current?.getCenter();
-          if (newCenter && connectionLineRef.current) {
-            connectionLineRef.current.setPath([startTickerLocation, { lat: newCenter.lat(), lng: newCenter.lng() }]);
-          }
-        });
-      } else {
-        // Update line path
-        connectionLineRef.current.setPath([startTickerLocation, { lat: circleCenter.lat(), lng: circleCenter.lng() }]);
-      }
-
-      return () => {
-        if (connectionLineListenerRef.current) {
-          google.maps.event.removeListener(connectionLineListenerRef.current);
-          connectionLineListenerRef.current = null;
-        }
-      };
-    }, [startTickerLocation, isAreaSelectionMode]);
+    // Connection line cleanup happens in circle effect
+    // (Connection line is now created when circle is created)
 
     // Clear polygon when coordinates become empty (external clear)
     useEffect(() => {
