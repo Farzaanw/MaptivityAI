@@ -10,21 +10,21 @@ const envPath = path.resolve(__dirname, '..', '.env');
 dotenv.config({ path: envPath });
 
 const PORT = 5050;
-const API_KEY = process.env.GOOGLE_PLACES_API_KEY;
+const API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY;
 
 console.log('[startup] CWD:', process.cwd());
 console.log('[startup] Resolved .env path:', envPath);
 console.log('[startup] .env file exists:', fs.existsSync(envPath) ? 'yes' : 'NO');
-console.log('[startup] GOOGLE_PLACES_API_KEY prefix:', API_KEY ? `${API_KEY.slice(0, 6)}…` : 'NOT SET');
+console.log('[startup] VITE_GOOGLE_MAPS_API_KEY prefix:', API_KEY ? `${API_KEY.slice(0, 6)}…` : 'NOT SET');
 
 if (
   !API_KEY ||
   API_KEY.toLowerCase().startsWith('your_') ||
   !API_KEY.startsWith('AIza')
 ) {
-  console.error('\n[FATAL] GOOGLE_PLACES_API_KEY is missing or invalid.');
+  console.error('\n[FATAL] VITE_GOOGLE_MAPS_API_KEY is missing or invalid.');
   console.error('Add your real API key to server/.env (not .env.example):');
-  console.error('  GOOGLE_PLACES_API_KEY=AIza...your_key_here\n');
+  console.error('  VITE_GOOGLE_MAPS_API_KEY=AIza...your_key_here\n');
   process.exit(1);
 }
 

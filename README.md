@@ -75,53 +75,41 @@ cd MaptivityAI
 2) Install frontend dependencies
 
 npm install
-
-3) Install backend dependencies
-
-cd server
-npm install
-cd ..
+npm run dev:all
 
 ------------------------------------------------------------
 GOOGLE API SETUP (REQUIRED)
 ------------------------------------------------------------
 
-You must create TWO separate API keys.
-
-------------------------------------------------------------
 1) FRONTEND KEY (Browser Key)
-------------------------------------------------------------
 
 Used for:
-- Maps JavaScript API
-- Places Autocomplete
+- Google Maps feature
+- Search Location autocomplete
 
 Steps:
 1. Go to Google Cloud Console
 2. APIs & Services -> Credentials
 3. Create Credentials -> API Key
-4. Rename to: Maptivity Frontend Key
+4. Rename to: Maptivity_Frontend_Key
 
 Application restrictions:
-Select "Websites (HTTP referrers)"
-Add:
-http://localhost:3000/*
+- For local development: Select "None"
+- For production: Select "IP addresses" and add your server IP
 
-API restrictions:
-Restrict key to:
+API restrictions (enable these):
 - Maps JavaScript API
 - Places API (New)
 
-Add to root .env file:
+Add to root .env file in project root:
 
-Create file in project root:
 .env
 
 Add:
-VITE_GOOGLE_MAPS_API_KEY=AIzaSyYOUR_FRONTEND_KEY
+VITE_GOOGLE_MAPS_API_KEY=YOUR_FRONTEND_KEY
 
 ------------------------------------------------------------
-1b) Optional KEY (allows for location search images to show)
+1b) Optional Unsplash KEY (for location search images)
 ------------------------------------------------------------
 
 a. Get free API key at https://unsplash.com/developers
@@ -131,40 +119,61 @@ b. Add to `.env`:
 VITE_UNSPLASH_API_KEY=your_unsplash_api_key_here
 ```
 
-- The app now can fetche location images from Unsplash Key
+- The app now can fetch location images from Unsplash
 
 
 ------------------------------------------------------------
-2) BACKEND KEY (Server Key)
+2) BACKEND SETUP (Optional - use same Places API key)
 ------------------------------------------------------------
 
-Used for:
-- Places API (New) HTTP requests
+The backend uses the SAME Places API (New) key as the frontend.
+You can reuse VITE_GOOGLE_MAPS_API_KEY for the backend.
 
-Steps:
-1. Google Cloud Console -> Credentials
-2. Create Credentials -> API Key
-3. Rename to: Maptivity Backend Key
+Why reuse the same key?
+- Simpler setup (one key instead of two)
+- Both frontend and backend use Places API (New) via different methods
+  * Frontend: JavaScript SDK (browser)
+  * Backend: HTTP REST API (server)
+- Easier to manage quotas and billing
 
-Application restrictions:
-None (for local development)
-
-API restrictions:
-Restrict key to:
-- Places API (New)
-
-Add to server/.env:
+OPTION A: Use the same key (recommended for MVP)
+----
 
 Create:
 server/.env
 
 Add:
-GOOGLE_PLACES_API_KEY=AIzaSyYOUR_BACKEND_KEY
+VITE_GOOGLE_MAPS_API_KEY=YOUR_FRONTEND_KEY
 PORT=5050
 
-IMPORTANT:
-- Do NOT prefix backend key with VITE_
-- Never expose backend key in frontend code
+Note: Copy the same key value from your root .env file
+
+
+OPTION B: Create a separate backend key (advanced)
+----
+
+If you want separate keys for monitoring/security:
+
+Steps:
+1. Go to Google Cloud Console
+2. APIs & Services -> Credentials
+3. Create Credentials -> API Key
+4. Rename to: Maptivity_Backend_Key
+
+Application restrictions:
+For local development: Select "None"
+For production: Select "IP addresses" and add your server IP
+
+API restrictions:
+Restrict key to:
+- Places API (New)
+
+Create:
+server/.env
+
+Add:
+VITE_GOOGLE_MAPS_API_KEY=YOUR_BACKEND_KEY
+PORT=5050
 
 ------------------------------------------------------------
 BILLING
