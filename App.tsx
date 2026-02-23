@@ -187,6 +187,27 @@ const App: React.FC = () => {
         />
 
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20 flex gap-3">
+          {startTickerLocation && (
+            <button
+              onClick={() => {
+                if (mapContainerRef.current) {
+                  mapContainerRef.current.panToLocation(startTickerLocation.lat, startTickerLocation.lng);
+                }
+              }}
+              className="px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 transform hover:scale-105 active:scale-95 transition-colors bg-gray-700 hover:bg-gray-800 text-white"
+              title="Pan back to your starting location"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L9 4.414V16a1 1 0 102 0V4.414l6.293 6.293a1 1 0 001.414-1.414l-7-7z" />
+              </svg>
+              Back to Start
+            </button>
+          )}
           <button
             onClick={handleSetSearchAreaClick}
             disabled={isAreaSelectionMode && !startTickerLocation}
