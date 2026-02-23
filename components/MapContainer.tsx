@@ -4,6 +4,41 @@
 - Browser Geolocation API - find users current location (permission-based) */
 import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 
+// CSS for pulsing circle animation
+const pulseStyle = document.createElement('style');
+pulseStyle.textContent = `
+  @keyframes pulse-glow {
+    0%, 100% { 
+      filter: drop-shadow(0 0 2px rgba(30, 64, 175, 0.4));
+      opacity: 0.5;
+    }
+    50% { 
+      filter: drop-shadow(0 0 8px rgba(30, 64, 175, 0.8));
+      opacity: 0.8;
+    }
+  }
+  @keyframes pulse-handle {
+    0%, 100% { 
+      opacity: 0.3;
+      transform: scale(1);
+    }
+    50% { 
+      opacity: 1;
+      transform: scale(1.2);
+    }
+  }
+  .pulse-circle {
+    animation: pulse-glow 2s infinite;
+  }
+  .pulse-handle {
+    animation: pulse-handle 2s infinite;
+  }
+`;
+if (!document.head.querySelector('style[data-pulse-animation]')) {
+  pulseStyle.setAttribute('data-pulse-animation', 'true');
+  document.head.appendChild(pulseStyle);
+}
+
 export interface LatLng {
   lat: number;
   lng: number;
@@ -272,6 +307,61 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
           editable: true, // Allow radius adjustment by dragging edge
           draggable: false, // Disable center dragging to avoid conflicts
         });
+
+        // Create animated pulsing glow effect
+        let pulseDirection = 1;
+        let pulseOpacity = 0.3;
+        const pulseInterval = setInterval(() => {
+          pulseOpacity += pulseDirection * 0.05;
+          if (pulseOpacity >= 0.8) pulseDirection = -1;
+          if (pulseOpacity <= 0.3) pulseDirection = 1;
+          
+          searchCircleRef.current?.setOptions({
+            strokeOpacity: pulseOpacity,
+            strokeWeight: 10 + (pulseOpacity - 0.3) * 10,
+          });
+        }, 120);
+
+        // Stop pulsing after 7 seconds
+        setTimeout(() => {
+          clearInterval(pulseInterval);
+          searchCircleRef.current?.setOptions({
+            strokeOpacity: 0.5,
+            strokeWeight: 10,
+          });
+        }, 7000);
+
+        // Create animated handles at N, E, S, W positions
+        const center = searchCircleRef.current.getCenter();
+        const radius = searchCircleRef.current.getRadius();
+        const handlePositions = [
+          { lat: center.lat() + (radius / 111000), lng: center.lng(), label: 'N' }, // North
+          { lat: center.lat() - (radius / 111000), lng: center.lng(), label: 'S' }, // South
+          { lat: center.lat(), lng: center.lng() + (radius / (111000 * Math.cos(center.lat() * Math.PI / 180))), label: 'E' }, // East
+          { lat: center.lat(), lng: center.lng() - (radius / (111000 * Math.cos(center.lat() * Math.PI / 180))), label: 'W' }, // West
+        ];
+
+        const handleMarkers = handlePositions.map(pos => {
+          const marker = new google.maps.Marker({
+            position: pos,
+            map: mapRef.current,
+            title: 'Drag to adjust',
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 8,
+              fillColor: '#1E40AF',
+              fillOpacity: 0.7,
+              strokeColor: '#FFFFFF',
+              strokeWeight: 2,
+            },
+          });
+          return marker;
+        });
+
+        // Auto-remove handles after 7 seconds
+        setTimeout(() => {
+          handleMarkers.forEach(marker => marker.setMap(null));
+        }, 7000);
 
         // Listen for radius changes (when user drags circle edge)
         circleListenerRef.current = searchCircleRef.current.addListener('radius_changed', () => {
