@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [currentLocation, setCurrentLocation] = useState<LatLng>({ lat: 37.7749, lng: -122.4194 });
   const [searchQuery, setSearchQuery] = useState('');
   const [polygonCoordinates, setPolygonCoordinates] = useState<LatLng[]>([]);
@@ -128,6 +129,7 @@ const App: React.FC = () => {
         setSearchQuery(query);
         setIsSidebarOpen(true);
         setIsLoading(true);
+        setError(null);
         try {
           const results = await searchNearbyActivities({
             lat: circleData.center.lat,
@@ -136,6 +138,10 @@ const App: React.FC = () => {
             query,
           });
           setActivities(results);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Issue retrieving places';
+          setError(message);
+          setActivities([]);
         } finally {
           setIsLoading(false);
         }
@@ -171,6 +177,7 @@ const App: React.FC = () => {
           isLoading={isLoading}
           onSearch={handleSearch}
           searchQuery={searchQuery}
+          error={error}
         />
 
         <LocationSearch

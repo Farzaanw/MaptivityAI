@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
+import NodeCache from 'node-cache';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.resolve(__dirname, '..', '.env');
@@ -11,6 +12,7 @@ dotenv.config({ path: envPath });
 
 const PORT = 5050;
 const API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY;
+const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 }); // 10 min cache, check every 2 min
 
 console.log('[startup] CWD:', process.cwd());
 console.log('[startup] Resolved .env path:', envPath);
@@ -71,6 +73,14 @@ app.get('/api/places/nearby', async (req, res) => {
     return res.status(500).json({ error: 'GOOGLE_PLACES_API_KEY not configured' });
   }
 
+  // Generate cache key
+  const cacheKey = `places:${lat}:${lng}:${radius}:${q}`;
+  const cachedResult = cache.get(cacheKey);
+  if (cachedResult) {
+    console.log('[cache] HIT:', cacheKey);
+    return res.json(cachedResult);
+  }
+
   const center = { latitude: lat, longitude: lng };
   const circle = { center, radius };
   const headers = {
@@ -102,17 +112,34 @@ app.get('/api/places/nearby', async (req, res) => {
       headers,
       body: JSON.stringify({
         includedTypes: [
-          'tourist_attraction',
+          'amusement_park',
+          'aquarium',
+          'art_gallery',
+          'bakery',
+          'bar',
+          'beach',
+          'beauty_salon',
+          'bowling_alley',
+          'cafe',
+          'casino',
+          'church',
+          'garden',
+          'golf_course',
+          'gym',
+          'hotel',
+          'ice_cream_shop',
+          'lake',
+          'library',
+          'movie_theater',
           'museum',
           'park',
-          'art_gallery',
-          'amusement_park',
-          'zoo',
-          'aquarium',
-          'movie_theater',
-          'shopping_mall',
           'restaurant',
-          'cafe',
+          'school',
+          'shopping_mall',
+          'spa',
+          'stadium',
+          'tourist_attraction',
+          'zoo',
         ],
         maxResultCount: 20,
         locationRestriction: { circle },
@@ -157,7 +184,9 @@ app.get('/api/places/nearby', async (req, res) => {
     };
   });
 
-  res.json({ places });
+  const result = { places };
+  cache.set(cacheKey, result);
+  res.json(result);
 });
 
 app.listen(PORT, () => {

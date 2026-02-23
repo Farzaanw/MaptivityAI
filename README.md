@@ -72,10 +72,12 @@ SETUP
 git clone <REPO_URL>
 cd MaptivityAI
 
-2) Install frontend dependencies
-
-npm install
+2) Run everything with one command
 npm run dev:all
+
+This installs all dependencies and starts:
+- Frontend: http://localhost:3000
+- Backend: http://localhost:5050
 
 ------------------------------------------------------------
 GOOGLE API SETUP (REQUIRED)
@@ -183,18 +185,6 @@ Google Places API requires billing enabled.
 In Google Cloud Console:
 - Ensure project is linked to active billing account
 - Ensure Places API (New) is enabled
-
-------------------------------------------------------------
-RUN LOCALLY
-------------------------------------------------------------
-
-From project root:
-
-npm run dev:all
-
-This starts:
-Frontend: http://localhost:3000
-Backend:  http://localhost:5050
 
 ------------------------------------------------------------
 TROUBLESHOOTING

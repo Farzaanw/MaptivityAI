@@ -39,15 +39,21 @@ export async function searchNearbyActivities(params: {
     q: query,
   });
   const baseUrl = import.meta.env.DEV ? 'http://localhost:5050' : '';
-  const res = await fetch(`${baseUrl}/api/places/nearby?${searchParams}`);
-  if (!res.ok) throw new Error(`Places API error: ${res.status}`);
-  const data = (await res.json()) as NearbyResponse;
-  const places = data.places ?? [];
-  return places.map((p) => ({
-    id: p.id,
-    title: p.name,
-    description: p.address ?? '',
-    uri: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.lat + ',' + p.lng)}`,
-    category: inferCategory(p.types),
-  }));
+  
+  try {
+    const res = await fetch(`${baseUrl}/api/places/nearby?${searchParams}`);
+    if (!res.ok) throw new Error(`Places API error: ${res.status}`);
+    const data = (await res.json()) as NearbyResponse;
+    const places = data.places ?? [];
+    return places.map((p) => ({
+      id: p.id,
+      title: p.name,
+      description: p.address ?? '',
+      uri: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.lat + ',' + p.lng)}`,
+      category: inferCategory(p.types),
+    }));
+  } catch (error) {
+    console.error('[placesService] Error fetching places:', error);
+    throw new Error('Unable to retrieve places. Please try again.');
+  }
 }

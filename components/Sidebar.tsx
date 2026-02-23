@@ -10,9 +10,10 @@ interface SidebarProps {
   isLoading: boolean;
   onSearch: (query: string) => void;
   searchQuery: string;
+  error?: string | null;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggle, activities, isLoading, onSearch, searchQuery }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggle, activities, isLoading, onSearch, searchQuery, error }) => {
   const [localQuery, setLocalQuery] = useState(searchQuery);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -63,6 +64,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggle, activities, isLoading
               Activities Near You
               <span className="text-xs font-medium bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">{activities.length} found</span>
             </h3>
+
+            {error && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                <p className="font-semibold">⚠️ Issue with Retrieval</p>
+                <p className="mt-1">{error}</p>
+              </div>
+            )}
 
             {isLoading ? (
               <div className="space-y-4">
