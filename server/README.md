@@ -121,16 +121,4 @@ Now, if you test a sign up on your local site with `john@example.com`, it will c
 
 ---
 
-## 6. Social Providers (Google, Apple, GitHub)
-
-The buttons for Google, Apple, and GitHub in the login UI are fully wired up in `AuthOverlay.tsx`. To make them actually work:
-
-1. Go to **Authentication -> Providers** in Supabase.
-2. Enable the social provider you want (e.g., Google).
-3. Follow the instructions provided by Supabase in that window to get a Client ID and Client Secret from the provider (e.g., Google Cloud Console).
-4. Enter those credentials into the Supabase window and save.
-5. In your frontend, the `onClick` handler (`handleSocialAuth('google')`) will automatically redirect the user to log in!
-
----
-
 **You are fully set up! Run `npm run dev` and test out your new authentication system.**
