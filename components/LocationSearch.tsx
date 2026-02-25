@@ -288,7 +288,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, onSet
               value={inputValue}
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Enter location..."
+              placeholder="Find a place..."
               className="w-full px-4 py-2 pr-20 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
             {loading && (

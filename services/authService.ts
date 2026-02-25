@@ -78,6 +78,13 @@ export async function resetPassword(email: string): Promise<AuthResult> {
     return { success: true };
 }
 
+/** Update the currently authenticated user's password (used after PASSWORD_RECOVERY). */
+export async function updatePassword(newPassword: string): Promise<AuthResult> {
+    const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) return { success: false, error: error.message };
+    return { success: true, user: data.user ?? undefined };
+}
+
 // ─── Session Management ──────────────────────────────────────
 
 /** Get the current session (null if not logged in). */
