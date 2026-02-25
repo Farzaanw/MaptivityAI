@@ -3,6 +3,7 @@ import Header from './components/Header';
 import MapContainer from './components/MapContainer';
 import Sidebar from './components/Sidebar';
 import LocationSearch from './components/LocationSearch';
+import AuthOverlay from './components/AuthOverlay';
 import { Activity } from './types';
 import { searchNearbyActivities } from './services/placesService';
 
@@ -32,6 +33,7 @@ const App: React.FC = () => {
   const [startTickerLocation, setStartTickerLocation] = useState<LatLng | null>(null);
   const [searchRadius, setSearchRadius] = useState(2000);
   const mapContainerRef = useRef<MapContainerHandle | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const hasSearchArea = circle !== null;
 
@@ -66,14 +68,14 @@ const App: React.FC = () => {
       mapContainerRef.current?.clearSearchCircle();
       setCircle(null);
       setActivities([]);
-      
+
       // Set new start location and enter area selection mode
       setStartTickerLocation({ lat, lng });
       setIsAreaSelectionMode(true);
-      
+
       // Place the ticker symbol on the map
       mapContainerRef.current?.addMarkerAtLocation(lat, lng, locationName, [[lat - 0.01, lng - 0.01], [lat + 0.01, lng + 0.01]]);
-      
+
       // Minimize both sidebars
       setIsSidebarOpen(false);
       setIsLocationSearchMinimized(true);
@@ -251,15 +253,14 @@ const App: React.FC = () => {
           <button
             onClick={handleSetSearchAreaClick}
             disabled={isAreaSelectionMode && !startTickerLocation}
-            className={`px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 transform hover:scale-105 active:scale-95 transition-colors disabled:opacity-70 disabled:cursor-not-allowed ${
-              hasSearchArea && !isAreaSelectionMode
+            className={`px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 transform hover:scale-105 active:scale-95 transition-colors disabled:opacity-70 disabled:cursor-not-allowed ${hasSearchArea && !isAreaSelectionMode
                 ? 'bg-slate-600 hover:bg-slate-700 text-white'
                 : startTickerLocation && isAreaSelectionMode
                   ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
                   : isAreaSelectionMode
                     ? 'bg-indigo-500 hover:bg-indigo-600 text-white'
                     : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-            }`}
+              }`}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -304,6 +305,11 @@ const App: React.FC = () => {
           )}
         </div>
       </main>
+
+      {/* Login/Sign-up overlay — shown until user authenticates */}
+      {!isAuthenticated && (
+        <AuthOverlay onAuthenticate={() => setIsAuthenticated(true)} />
+      )}
     </div>
   );
 };
