@@ -39,13 +39,13 @@ export async function searchNearbyActivities(params: {
     q: query,
   });
   const baseUrl = import.meta.env.DEV ? 'http://localhost:5050' : '';
-  
+
   try {
     const res = await fetch(`${baseUrl}/api/places/nearby?${searchParams}`);
     if (!res.ok) throw new Error(`Places API error: ${res.status}`);
     const data = (await res.json()) as NearbyResponse;
     const places = data.places ?? [];
-    
+
     // Deduplicate by ID to avoid showing the same place twice
     const seenIds = new Set<string>();
     const deduplicated = places.filter((p) => {
@@ -62,9 +62,26 @@ export async function searchNearbyActivities(params: {
       description: p.address ?? '',
       uri: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.lat + ',' + p.lng)}`,
       category: inferCategory(p.types),
+      rating: p.rating,
+      userRatingCount: p.userRatingCount,
+      priceLevel: p.priceLevel,
+      photoUrl: p.photoUrl ? `${baseUrl}/api/places/photo/${p.photoUrl}` : undefined,
     }));
   } catch (error) {
     console.error('[placesService] Error fetching places:', error);
     throw new Error('Unable to retrieve places. Please try again.');
   }
 }
+
+export async function getPlaceDetails(placeId: string): Promise<any> {
+  const baseUrl = import.meta.env.DEV ? 'http://localhost:5050' : '';
+  try {
+    const res = await fetch(`${baseUrl}/api/places/details/${placeId}`);
+    if (!res.ok) throw new Error(`Place details error: ${res.status}`);
+    return await res.json();
+  } catch (error) {
+    console.error('[placesService] Error fetching details:', error);
+    throw error;
+  }
+}
+

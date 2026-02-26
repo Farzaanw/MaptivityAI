@@ -87,7 +87,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, onSet
   // Handle input change and fetch suggestions
   const handleInputChange = (value: string) => {
     onInputChange(value);
-    
+
     if (value.length < 2) {
       setSuggestions([]);
       return;
@@ -176,7 +176,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, onSet
 
       const locationName =
         place.formattedAddress ?? placePrediction.text.text;
-      
+
       // Extract bounds from viewport (Google's recommended view for this location)
       let bounds: [[number, number], [number, number]] = [[lat - 0.01, lng - 0.01], [lat + 0.01, lng + 0.01]];
       if (place.viewport) {
@@ -202,7 +202,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, onSet
       }).filter(Boolean) || [];
 
       const displayName = place.displayName?.text || locationName;
-      
+
       setSelectedLocation({
         name: displayName,
         lat,
@@ -222,12 +222,12 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, onSet
         lng,
         timestamp: Date.now(),
       };
-      
+
       const updatedHistory = [
         newHistoryEntry,
         ...searchHistory.filter((item: any) => item.name !== newHistoryEntry.name),
       ].slice(0, 10); // Keep only last 10 searches
-      
+
       setSearchHistory(updatedHistory);
       localStorage.setItem('maptivitySearchHistory', JSON.stringify(updatedHistory));
 
@@ -246,15 +246,14 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, onSet
   };
 
   return (
-    <div 
-      className={`absolute top-4 left-4 bg-white rounded-lg z-30 flex flex-col gap-4 animate-in fade-in slide-in-from-left-4 duration-200 transition-all overflow-y-auto ${
-        isMinimized ? 'w-90 h-14 p-3' : selectedLocation ? 'w-96 max-h-screen p-6' : 'w-96 h-96 p-6'
-      }`}
+    <div
+      className={`absolute top-4 left-4 bg-white rounded-lg z-30 flex flex-col gap-4 animate-in fade-in slide-in-from-left-4 duration-200 transition-all overflow-y-auto ${isMinimized ? 'w-90 h-14 p-3' : selectedLocation ? 'w-96 max-h-screen p-6' : 'w-96 h-96 p-6'
+        }`}
       style={{
         boxShadow: 'inset 0 0 20px rgba(59, 130, 246, 0.2), 0 0 40px rgba(59, 130, 246, 0.5), 0 8px 24px rgba(0, 0, 0, 0.15)'
       }}
     >
-      <div 
+      <div
         className="flex justify-between items-center cursor-pointer"
         onClick={() => isMinimized && onMinimizedChange(false)}
       >
@@ -288,8 +287,9 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, onSet
               value={inputValue}
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Find a place..."
-              className="w-full px-4 py-2 pr-20 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="Find a location..."
+              className="w-full px-4 py-2 pr-20 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:italic placeholder:text-gray-400/60"
+
             />
             {loading && (
               <div className="absolute right-14 top-2.5">
@@ -328,108 +328,107 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, onSet
             )}
           </div>
 
-        {/* Suggestions dropdown - appears right below search bar above location details when location is selected */}
-        {suggestions.length > 0 && (
-          <div className={`overflow-y-auto bg-gray-50 rounded-lg border border-gray-200 ${
-            selectedLocation ? 'absolute top-28 left-6 right-6 z-50 max-h-96 shadow-xl' : 'flex-1'
-          }`}>
-            {suggestions.map((suggestion, index) => (
-              <button
-                key={index}
-                onClick={() => handleSuggestionClick(suggestion)}
-                className="w-full text-left px-4 py-3 hover:bg-indigo-50 border-b border-gray-200 last:border-b-0 transition-colors"
-              >
-                {/* <div className="font-medium text-gray-800 text-sm">{suggestion.main_text || suggestion.mainText || suggestion.description}</div> */}
+          {/* Suggestions dropdown - appears right below search bar above location details when location is selected */}
+          {suggestions.length > 0 && (
+            <div className={`overflow-y-auto bg-gray-50 rounded-lg border border-gray-200 ${selectedLocation ? 'absolute top-28 left-6 right-6 z-50 max-h-96 shadow-xl' : 'flex-1'
+              }`}>
+              {suggestions.map((suggestion, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  className="w-full text-left px-4 py-3 hover:bg-indigo-50 border-b border-gray-200 last:border-b-0 transition-colors"
+                >
+                  {/* <div className="font-medium text-gray-800 text-sm">{suggestion.main_text || suggestion.mainText || suggestion.description}</div> */}
                   {/* New API uses 'placePrediction', Legacy used 'description' */}
-                <div className="font-medium text-gray-800 text-sm">
-                  {suggestion.placePrediction?.text?.text ?? "Unknown location"}
-                </div>
+                  <div className="font-medium text-gray-800 text-sm">
+                    {suggestion.placePrediction?.text?.text ?? "Unknown location"}
+                  </div>
 
-                <div className="text-gray-500 text-xs">{suggestion.secondary_text || suggestion.secondaryText}</div>
-              </button>
-            ))}
-          </div>
-        )}
+                  <div className="text-gray-500 text-xs">{suggestion.secondary_text || suggestion.secondaryText}</div>
+                </button>
+              ))}
+            </div>
+          )}
 
-        {inputValue.length > 0 && suggestions.length === 0 && !loading && !selectedLocation && (
-          <div className="text-center text-gray-500 text-sm py-4">
-            No locations found
-          </div>
-        )}
+          {inputValue.length > 0 && suggestions.length === 0 && !loading && !selectedLocation && (
+            <div className="text-center text-gray-500 text-sm py-4">
+              No locations found
+            </div>
+          )}
 
-        {/* Search History - Show when no input or no suggestions */}
-        {!inputValue && searchHistory.length > 0 && !selectedLocation && (
-          <div className="flex-1 overflow-y-auto bg-gray-50 rounded-lg border border-gray-200">
-            {/* <div className="px-4 py-2 border-b border-gray-200 sticky top-0 bg-gray-50">
+          {/* Search History - Show when no input or no suggestions */}
+          {!inputValue && searchHistory.length > 0 && !selectedLocation && (
+            <div className="flex-1 overflow-y-auto bg-gray-50 rounded-lg border border-gray-200">
+              {/* <div className="px-4 py-2 border-b border-gray-200 sticky top-0 bg-gray-50">
               <p className="text-xs font-semibold text-gray-600">Recent Searches</p>
             </div> */}
-            {searchHistory.map((item, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between px-4 py-3 hover:bg-indigo-50 border-b border-gray-200 last:border-b-0 transition-colors group"
-              >
-                <button
-                  onClick={async () => {
-                    // Reconstruct location object and select it
-                    const bounds: [[number, number], [number, number]] = [
-                      [item.lat - 0.01, item.lng - 0.01],
-                      [item.lat + 0.01, item.lng + 0.01],
-                    ];
-                    
-                    onLocationSelect(item.lat, item.lng, item.name, bounds);
-                    
-                    // Fetch image from Unsplash
-                    const imageUrl = await getLocationImage(item.name);
-                    
-                    setSelectedLocation({
-                      name: item.name,
-                      lat: item.lat,
-                      lng: item.lng,
-                      photos: imageUrl ? [imageUrl] : [],
-                      rating: null,
-                      userRatingCount: 0,
-                      address: item.address,
-                      editorialSummary: null,
-                    });
-                    
-                    onInputChange(item.name);
-                    setSuggestions([]);
-                  }}
-                  className="flex-1 text-left"
+              {searchHistory.map((item, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between px-4 py-3 hover:bg-indigo-50 border-b border-gray-200 last:border-b-0 transition-colors group"
                 >
-                  <div className="font-medium text-gray-800 text-sm">{item.name}</div>
-                  <div className="text-gray-500 text-xs">{item.address}</div>
-                </button>
+                  <button
+                    onClick={async () => {
+                      // Reconstruct location object and select it
+                      const bounds: [[number, number], [number, number]] = [
+                        [item.lat - 0.01, item.lng - 0.01],
+                        [item.lat + 0.01, item.lng + 0.01],
+                      ];
+
+                      onLocationSelect(item.lat, item.lng, item.name, bounds);
+
+                      // Fetch image from Unsplash
+                      const imageUrl = await getLocationImage(item.name);
+
+                      setSelectedLocation({
+                        name: item.name,
+                        lat: item.lat,
+                        lng: item.lng,
+                        photos: imageUrl ? [imageUrl] : [],
+                        rating: null,
+                        userRatingCount: 0,
+                        address: item.address,
+                        editorialSummary: null,
+                      });
+
+                      onInputChange(item.name);
+                      setSuggestions([]);
+                    }}
+                    className="flex-1 text-left"
+                  >
+                    <div className="font-medium text-gray-800 text-sm">{item.name}</div>
+                    <div className="text-gray-500 text-xs">{item.address}</div>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const updatedHistory = searchHistory.filter((_, i) => i !== index);
+                      setSearchHistory(updatedHistory);
+                      localStorage.setItem('maptivitySearchHistory', JSON.stringify(updatedHistory));
+                    }}
+                    className="ml-2 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                    title="Delete this location from history"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+              {searchHistory.length > 0 && (
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const updatedHistory = searchHistory.filter((_, i) => i !== index);
-                    setSearchHistory(updatedHistory);
-                    localStorage.setItem('maptivitySearchHistory', JSON.stringify(updatedHistory));
+                  onClick={() => {
+                    setSearchHistory([]);
+                    localStorage.removeItem('maptivitySearchHistory');
                   }}
-                  className="ml-2 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100"
-                  title="Delete this location from history"
+                  className="w-full px-4 py-2 text-xs text-gray-500 hover:text-red-600 transition-colors border-t"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
+                  Clear History
                 </button>
-              </div>
-            ))}
-            {searchHistory.length > 0 && (
-              <button
-                onClick={() => {
-                  setSearchHistory([]);
-                  localStorage.removeItem('maptivitySearchHistory');
-                }}
-                className="w-full px-4 py-2 text-xs text-gray-500 hover:text-red-600 transition-colors border-t"
-              >
-                Clear History
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Location Details Section */}
@@ -456,7 +455,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, onSet
               const addressParts = selectedLocation.address ? selectedLocation.address.split(',').map((s: string) => s.trim()) : [];
               const cityState = addressParts.slice(0, -1).join(', ');
               const country = addressParts.slice(-1)[0];
-              
+
               return (
                 <>
                   <h2 className="text-2xl font-bold text-gray-900 mb-1">{cityState}</h2>

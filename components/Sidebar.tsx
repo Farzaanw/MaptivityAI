@@ -10,10 +10,26 @@ interface SidebarProps {
   isLoading: boolean;
   onSearch: (query: string) => void;
   searchQuery: string;
+  onViewDetails: (activity: Activity) => void;
+  favorites: Activity[];
+  onToggleFavorite: (activity: Activity) => void;
   error?: string | null;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggle, activities, isLoading, onSearch, searchQuery, error }) => {
+const Sidebar: React.FC<SidebarProps> = ({
+  isOpen,
+  toggle,
+  activities,
+  isLoading,
+  onSearch,
+  searchQuery,
+  onViewDetails,
+  favorites,
+  onToggleFavorite,
+  error
+}) => {
+
+
   const [localQuery, setLocalQuery] = useState(searchQuery);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -22,19 +38,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggle, activities, isLoading
   };
 
   return (
-    <div 
-      className={`absolute top-0 right-0 h-full bg-white/95 backdrop-blur-lg shadow-2xl transition-all duration-300 ease-in-out z-40 flex flex-col ${
-        isOpen ? 'w-full sm:w-96' : 'w-0'
-      }`}
+    <div
+      className={`absolute top-0 right-0 h-full bg-white/95 backdrop-blur-lg shadow-2xl transition-all duration-300 ease-in-out z-40 flex flex-col ${isOpen ? 'w-full sm:w-96' : 'w-0'
+        }`}
     >
       {/* Toggle Button */}
-      <button 
+      <button
         onClick={toggle}
         className="absolute -left-10 top-20 bg-white p-2 rounded-l-xl shadow-md border-y border-l border-gray-200 hover:text-indigo-600 transition-colors"
       >
-        <svg 
-          xmlns="http://www.w3.org/2000/svg" 
-          className={`h-6 w-6 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} 
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className={`h-6 w-6 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
           fill="none" viewBox="0 0 24 24" stroke="currentColor"
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -46,11 +61,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggle, activities, isLoading
           <form onSubmit={handleSubmit} className="mb-8">
             <label className="block text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">What are you looking for?</label>
             <div className="relative">
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={localQuery}
                 onChange={(e) => setLocalQuery(e.target.value)}
-                placeholder="E.g. Coffee, Parks, Museums..." 
+                placeholder="E.g. Coffee, Parks, Museums..."
                 className="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-3 pl-10 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
               />
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 absolute left-3 top-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -87,8 +102,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggle, activities, isLoading
             ) : activities.length > 0 ? (
               <div className="space-y-4">
                 {activities.map(activity => (
-                  <ActivityCard key={activity.id} activity={activity} />
+                  <ActivityCard
+                    key={activity.id}
+                    activity={activity}
+                    onViewDetails={onViewDetails}
+                    isFavorite={favorites.some(f => f.id === activity.id)}
+                    onToggleFavorite={onToggleFavorite}
+                  />
                 ))}
+
+
               </div>
             ) : (
               <div className="text-center py-20">

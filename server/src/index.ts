@@ -33,6 +33,10 @@ if (
 const app = express();
 const FIELDS =
   'places.id,places.displayName,places.location,places.formattedAddress,places.types,places.photos';
+const PLACE_DETAILS_FIELDS =
+  'id,displayName,formattedAddress,location,types,photos,rating,userRatingCount,priceLevel,websiteUri,internationalPhoneNumber,regularOpeningHours,editorialSummary,reviews,googleMapsUri';
+
+
 
 const GENERIC_QUERIES = ['things to do', 'fun things to do', ''];
 
@@ -256,6 +260,62 @@ app.get('/api/places/nearby', async (req, res) => {
   cache.set(cacheKey, result);
   res.json(result);
 });
+
+app.get('/api/places/details/:placeId', async (req, res) => {
+  const { placeId } = req.params;
+  if (!placeId) return res.status(400).json({ error: 'placeId is required' });
+  if (!API_KEY) return res.status(500).json({ error: 'API_KEY not configured' });
+
+  const cacheKey = `details:${placeId}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  const headers = {
+    'X-Goog-Api-Key': API_KEY,
+    'X-Goog-FieldMask': PLACE_DETAILS_FIELDS,
+  };
+
+  try {
+    const response = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, { headers });
+    if (!response.ok) {
+      const err = await response.text();
+      return res.status(response.status).json({ error: err || 'Places API error' });
+    }
+    const data = await response.json();
+    cache.set(cacheKey, data);
+    res.json(data);
+  } catch (error) {
+    console.error('[details] Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/places/photo/:photoName(*)', async (req, res) => {
+  const photoName = req.params.photoName;
+  const maxWidth = req.query.maxHeightPx || 800;
+  const maxHeight = req.query.maxWidthPx || 800;
+
+  if (!photoName) return res.status(400).send('Photo name required');
+  if (!API_KEY) return res.status(500).send('API_KEY not configured');
+
+  const photoUrl = `https://places.googleapis.com/v1/${photoName}/media?key=${API_KEY}&maxHeightPx=${maxHeight}&maxWidthPx=${maxWidth}`;
+
+  try {
+    const response = await fetch(photoUrl);
+    if (!response.ok) return res.status(response.status).send('Place photo error');
+
+    const contentType = response.headers.get('content-type');
+    if (contentType) res.setHeader('Content-Type', contentType);
+
+    // Stream the binary data
+    const buffer = await response.arrayBuffer();
+    res.send(Buffer.from(buffer));
+  } catch (error) {
+    console.error('[photo] Error:', error);
+    res.status(500).send('Internal server error');
+  }
+});
+
 
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);

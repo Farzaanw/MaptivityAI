@@ -4,10 +4,17 @@ import type { AppPage } from './components/Header';
 import MapContainer from './components/MapContainer';
 import Sidebar from './components/Sidebar';
 import LocationSearch from './components/LocationSearch';
-import AuthOverlay from './components/AuthOverlay';
-import ResetPasswordOverlay from './components/ResetPasswordOverlay';
-import PlannerPage from './components/PlannerPage';
-import FavoritesPage from './components/FavoritesPage';
+// import AuthOverlay from './components/AuthOverlay';
+// import ResetPasswordOverlay from './components/ResetPasswordOverlay';
+// import PlannerPage from './components/PlannerPage';
+// import FavoritesPage from './components/FavoritesPage';
+const AuthOverlay = React.lazy(() => import('./components/AuthOverlay'));
+const ResetPasswordOverlay = React.lazy(() => import('./components/ResetPasswordOverlay'));
+const PlannerPage = React.lazy(() => import('./components/PlannerPage'));
+const FavoritesPage = React.lazy(() => import('./components/FavoritesPage'));
+const DetailsSidebar = React.lazy(() => import('./components/DetailsSidebar'));
+
+
 import { Activity } from './types';
 import { searchNearbyActivities } from './services/placesService';
 import { getSession, onAuthStateChange } from './services/authService';
@@ -42,8 +49,12 @@ const App: React.FC = () => {
   const [isGuestMode, setIsGuestMode] = useState(false);
   const [activePage, setActivePage] = useState<AppPage>('map');
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [favorites, setFavorites] = useState<Activity[]>([]);
   // crossfade: 'idle' | 'fading'
+
   const [authTransition, setAuthTransition] = useState<'idle' | 'fading'>('idle');
+
 
   useEffect(() => {
     // Initial session check
@@ -178,9 +189,9 @@ const App: React.FC = () => {
       if (circleData) {
         setCircle(circleData);
         setIsAreaSelectionMode(false);
-        const query = searchQuery || 'Find a location...';
-        setSearchQuery(query);
+        const query = searchQuery || 'things to do';
         setIsSidebarOpen(true);
+
         setIsLoading(true);
         setError(null);
         try {
@@ -206,14 +217,27 @@ const App: React.FC = () => {
     }
   }, [startTickerLocation, isAreaSelectionMode, searchQuery, hasSearchArea]);
 
+  const toggleFavorite = useCallback((activity: Activity) => {
+    setFavorites((prev) => {
+      const isAlreadyFav = prev.some((f) => f.id === activity.id);
+      if (isAlreadyFav) {
+        return prev.filter((f) => f.id !== activity.id);
+      }
+      return [...prev, activity];
+    });
+  }, []);
+
   const handleReset = useCallback(() => {
+
+
     // Reset everything back to Screen 1
     mapContainerRef.current?.clearSearchCircle();
     setStartTickerLocation(null);
     setCircle(null);
     setActivities([]);
     setIsAreaSelectionMode(false);
-    setSearchQuery('things to do');
+    setSearchQuery('');
+
     setIsSidebarOpen(false);
   }, []);
 
@@ -245,105 +269,101 @@ const App: React.FC = () => {
         without any layout shift. The overlay sits absolute on top.
       */}
       <main className="flex-1 relative flex flex-col min-h-0">
+        <React.Suspense fallback={
+          <div className="flex-1 flex items-center justify-center bg-gray-50">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-indigo-600 font-medium animate-pulse">Loading Maptivity...</p>
+            </div>
+          </div>
+        }>
+          {/* ── Map page ──────────────────────────────────────────── */}
+          {activePage === 'map' && (
+            <>
+              <MapContainer
+                ref={mapContainerRef}
+                onRegionSelect={handleMapMove}
+                center={currentLocation}
+                polygonCoordinates={polygonCoordinates}
+                onPolygonChange={handlePolygonChange}
+                isDrawingMode={isDrawingMode}
+                onDrawingModeChange={setIsDrawingMode}
+                isAreaSelectionMode={isAreaSelectionMode}
+                onMapClickForPlacement={handleMapClickForPlacement}
+                startTickerLocation={startTickerLocation}
+                onRadiusChange={handleRadiusChange}
+              />
 
-        {/* ── Map page ──────────────────────────────────────────── */}
-        {activePage === 'map' && (
-          <>
-            <MapContainer
-              ref={mapContainerRef}
-              onRegionSelect={handleMapMove}
-              center={currentLocation}
-              polygonCoordinates={polygonCoordinates}
-              onPolygonChange={handlePolygonChange}
-              isDrawingMode={isDrawingMode}
-              onDrawingModeChange={setIsDrawingMode}
-              isAreaSelectionMode={isAreaSelectionMode}
-              onMapClickForPlacement={handleMapClickForPlacement}
-              startTickerLocation={startTickerLocation}
-              onRadiusChange={handleRadiusChange}
-            />
+              <Sidebar
+                isOpen={isSidebarOpen}
+                toggle={toggleSidebar}
+                activities={hasSearchArea ? activities : []}
+                isLoading={isLoading}
+                onSearch={handleSearch}
+                searchQuery={searchQuery}
+                onViewDetails={setSelectedActivity}
+                favorites={favorites}
+                onToggleFavorite={toggleFavorite}
+                error={error}
+              />
 
-            <Sidebar
-              isOpen={isSidebarOpen}
-              toggle={toggleSidebar}
-              activities={hasSearchArea ? activities : []}
-              isLoading={isLoading}
-              onSearch={handleSearch}
-              searchQuery={searchQuery}
-              error={error}
-            />
 
-            <LocationSearch
-              inputValue={searchQuery}
-              onInputChange={setSearchQuery}
-              onLocationSelect={handleLocationSelect}
-              onSetAsStartLocation={handleSetAsStartLocation}
-              isMinimized={isLocationSearchMinimized}
-              onMinimizedChange={setIsLocationSearchMinimized}
-            />
-
-            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20 flex gap-3">
-              {/* Show "Back to Start" on screens 2 and 3 */}
-              {startTickerLocation && (
-                <button
-                  onClick={() => {
-                    if (mapContainerRef.current) {
-                      mapContainerRef.current.panToLocation(startTickerLocation.lat, startTickerLocation.lng);
-                    }
-                  }}
-                  className="px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 transform hover:scale-105 active:scale-95 transition-colors bg-gray-700 hover:bg-gray-800 text-white"
-                  title="Pan back to your starting location"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L9 4.414V16a1 1 0 102 0V4.414l6.293 6.293a1 1 0 001.414-1.414l-7-7z" />
-                  </svg>
-                  Back to Start
-                </button>
+              {selectedActivity && (
+                <DetailsSidebar
+                  activity={selectedActivity}
+                  onClose={() => setSelectedActivity(null)}
+                  isFavorite={favorites.some(f => f.id === selectedActivity.id)}
+                  onToggleFavorite={toggleFavorite}
+                />
               )}
 
-              {/* Main action button */}
-              <button
-                onClick={handleSetSearchAreaClick}
-                disabled={isAreaSelectionMode && !startTickerLocation}
-                className={`px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 transform hover:scale-105 active:scale-95 transition-colors disabled:opacity-70 disabled:cursor-not-allowed ${hasSearchArea && !isAreaSelectionMode
-                  ? 'bg-slate-600 hover:bg-slate-700 text-white'
-                  : startTickerLocation && isAreaSelectionMode
-                    ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                    : isAreaSelectionMode
-                      ? 'bg-indigo-500 hover:bg-indigo-600 text-white'
-                      : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                  }`}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                {hasSearchArea && !isAreaSelectionMode
-                  ? 'Move Region'
-                  : startTickerLocation && isAreaSelectionMode
-                    ? 'Search This Area'
-                    : 'Set Search Area'}
-              </button>
 
-              {/* Screen 3: Show "Clear" button when circle exists and not in area selection mode */}
-              {hasSearchArea && !isAreaSelectionMode && (
+
+              <LocationSearch
+                inputValue={searchQuery}
+                onInputChange={setSearchQuery}
+                onLocationSelect={handleLocationSelect}
+                onSetAsStartLocation={handleSetAsStartLocation}
+                isMinimized={isLocationSearchMinimized}
+                onMinimizedChange={setIsLocationSearchMinimized}
+              />
+
+              <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20 flex gap-3">
+                {/* Show "Back to Start" on screens 2 and 3 */}
+                {startTickerLocation && (
+                  <button
+                    onClick={() => {
+                      if (mapContainerRef.current) {
+                        mapContainerRef.current.panToLocation(startTickerLocation.lat, startTickerLocation.lng);
+                      }
+                    }}
+                    className="px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 transform hover:scale-105 active:scale-95 transition-colors bg-gray-700 hover:bg-gray-800 text-white"
+                    title="Pan back to your starting location"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L9 4.414V16a1 1 0 102 0V4.414l6.293 6.293a1 1 0 001.414-1.414l-7-7z" />
+                    </svg>
+                    Back to Start
+                  </button>
+                )}
+
+                {/* Main action button */}
                 <button
-                  onClick={handleReset}
-                  className="px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 transform hover:scale-105 active:scale-95 transition-colors bg-red-400 hover:bg-red-500 text-white"
-                  title="Start over with a new location"
+                  onClick={handleSetSearchAreaClick}
+                  disabled={isAreaSelectionMode && !startTickerLocation}
+                  className={`px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 transform hover:scale-105 active:scale-95 transition-colors disabled:opacity-70 disabled:cursor-not-allowed ${hasSearchArea && !isAreaSelectionMode
+                    ? 'bg-slate-600 hover:bg-slate-700 text-white'
+                    : startTickerLocation && isAreaSelectionMode
+                      ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                      : isAreaSelectionMode
+                        ? 'bg-indigo-500 hover:bg-indigo-600 text-white'
+                        : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                    }`}
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -353,52 +373,87 @@ const App: React.FC = () => {
                   >
                     <path
                       fillRule="evenodd"
-                      d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                      d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
                       clipRule="evenodd"
                     />
                   </svg>
-                  Clear
+                  {hasSearchArea && !isAreaSelectionMode
+                    ? 'Move Region'
+                    : startTickerLocation && isAreaSelectionMode
+                      ? 'Search This Area'
+                      : 'Set Search Area'}
                 </button>
-              )}
-            </div>
-          </>
-        )}
 
-        {/* ── Planner page ───────────────────────────────────────── */}
-        {activePage === 'planner' && <PlannerPage />}
+                {/* Show "Clear" button if a location is selected or if search results are displayed */}
+                {(hasSearchArea || startTickerLocation) && (
+                  <button
+                    onClick={handleReset}
+                    className="px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 transform hover:scale-105 active:scale-95 transition-colors bg-red-400 hover:bg-red-500 text-white"
+                    title="Start over with a new location"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    Clear
+                  </button>
+                )}
+              </div>
+            </>
+          )}
 
-        {/* ── Favorites page ─────────────────────────────────────── */}
-        {activePage === 'favorites' && <FavoritesPage />}
+          {/* ── Planner page ───────────────────────────────────────── */}
+          {activePage === 'planner' && <PlannerPage />}
 
-        {/* Auth overlay — absolute so it sits on top regardless of active page */}
-        {showOverlay && (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              zIndex: 9999,
-              opacity: authTransition === 'fading' ? 0 : 1,
-              transition: 'opacity 1000ms ease-in-out',
-              pointerEvents: authTransition === 'fading' ? 'none' : undefined,
-            }}
-          >
-            <AuthOverlay
-              onAuthenticate={handleAuthenticate}
-              onGuestLogin={handleGuestLogin}
+          {/* ── Favorites page ─────────────────────────────────────── */}
+          {activePage === 'favorites' && (
+            <FavoritesPage
+              favorites={favorites}
+              onToggleFavorite={toggleFavorite}
+              onViewDetails={setSelectedActivity}
             />
-          </div>
-        )}
+          )}
 
-        {/* Password reset overlay — shown when user clicks reset link in email */}
-        {isResettingPassword && (
-          <ResetPasswordOverlay
-            onDone={() => {
-              setIsResettingPassword(false);
-              setIsAuthenticated(true);
-            }}
-          />
-        )}
+          {/* Auth overlay — absolute so it sits on top regardless of active page */}
+
+          {showOverlay && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                zIndex: 9999,
+                opacity: authTransition === 'fading' ? 0 : 1,
+                transition: 'opacity 1000ms ease-in-out',
+                pointerEvents: authTransition === 'fading' ? 'none' : undefined,
+              }}
+            >
+              <AuthOverlay
+                onAuthenticate={handleAuthenticate}
+                onGuestLogin={handleGuestLogin}
+              />
+            </div>
+          )}
+
+          {/* Password reset overlay — shown when user clicks reset link in email */}
+          {isResettingPassword && (
+            <ResetPasswordOverlay
+              onDone={() => {
+                setIsResettingPassword(false);
+                setIsAuthenticated(true);
+              }}
+            />
+          )}
+        </React.Suspense>
       </main>
+
     </div>
   );
 };
