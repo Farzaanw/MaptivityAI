@@ -13,8 +13,11 @@ interface SidebarProps {
   onViewDetails: (activity: Activity) => void;
   favorites: Activity[];
   onToggleFavorite: (activity: Activity) => void;
+  markedActivityIds: string[];
+  onToggleMark: (activity: Activity) => void;
   error?: string | null;
 }
+
 
 const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
@@ -26,8 +29,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   onViewDetails,
   favorites,
   onToggleFavorite,
+  markedActivityIds,
+  onToggleMark,
   error
 }) => {
+
 
 
   const [localQuery, setLocalQuery] = useState(searchQuery);
@@ -108,7 +114,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                     onViewDetails={onViewDetails}
                     isFavorite={favorites.some(f => f.id === activity.id)}
                     onToggleFavorite={onToggleFavorite}
+                    isMarked={markedActivityIds.includes(activity.id)}
+                    onToggleMark={onToggleMark}
                   />
+
                 ))}
 
 

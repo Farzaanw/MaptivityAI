@@ -11,7 +11,10 @@ export interface Activity {
   title: string;
   description: string;
   uri: string;
+  lat: number;
+  lng: number;
   category: 'restaurant' | 'attraction' | 'park' | 'entertainment';
+
   rating?: number;
   userRatingCount?: number;
   priceLevel?: number;

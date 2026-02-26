@@ -55,9 +55,20 @@ interface MapContainerProps {
   onMapClickForPlacement: (lat: number, lng: number) => void;
   startTickerLocation: { lat: number; lng: number } | null;
   onRadiusChange?: (radiusMeters: number) => void;
+  onRegionChange?: (center: LatLng, radiusMeters: number) => void;
+  markedActivities?: any[]; // Using any[] to avoid circular dependency if Activity isn't imported
+
+  circle?: { center: LatLng; radiusMeters: number } | null;
+  onRevert?: () => void;
+  canRevert?: boolean;
+  isLocked?: boolean;
+  onUnlock?: () => void;
 }
 
+
+
 interface MapContainerHandle {
+
   addMarkerAtLocation: (lat: number, lng: number, title: string, bounds: [[number, number], [number, number]]) => void;
   clearPolygon: () => void;
   setMapClickMode: (enabled: boolean) => void;
@@ -76,7 +87,11 @@ function pathToCoordinates(path: google.maps.MVCArray<google.maps.LatLng>): LatL
 }
 
 const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
-  ({ onRegionSelect, center, polygonCoordinates, onPolygonChange, isDrawingMode, onDrawingModeChange, isAreaSelectionMode, onMapClickForPlacement, startTickerLocation, onRadiusChange }, ref) => {
+  ({ onRegionSelect, center, polygonCoordinates, onPolygonChange, isDrawingMode, onDrawingModeChange, isAreaSelectionMode, onMapClickForPlacement, startTickerLocation, onRadiusChange, onRegionChange, markedActivities, circle, onRevert, canRevert, isLocked, onUnlock }, ref) => {
+
+
+
+
     const mapRef = useRef<google.maps.Map | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const markerRef = useRef<google.maps.Marker | null>(null);
@@ -94,7 +109,11 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
     const connectionLineListenerRef = useRef<google.maps.MapsEventListener | null>(null);
     const circleArrowMarkersRef = useRef<google.maps.Marker[]>([]);
     const circleArrowListenerRef = useRef<google.maps.MapsEventListener | null>(null);
+    const revertMarkerRef = useRef<google.maps.Marker | null>(null);
+    const activityMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
+
     const [mapType, setMapType] = React.useState<'roadmap' | 'satellite'>('roadmap');
+
 
     // Initialize map once
     useEffect(() => {
@@ -108,15 +127,15 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
         // Calculate minimum zoom level to fit vertical bounds in viewport
         const calculateMinZoom = () => {
           if (!containerRef.current) return 1;
-          
+
           const containerHeight = containerRef.current.clientHeight;
-          
+
           // For Web Mercator projection, ±85.0511° spans ~340 pixels at zoom 0
           // At each zoom level, this doubles
           // We need zoom level where 340 * 2^z >= containerHeight
           const pixelsPerZoom0 = 340;
           const minZoom = Math.log2(containerHeight / pixelsPerZoom0);
-          
+
           return Math.max(0, minZoom);
         };
 
@@ -149,7 +168,7 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
             if (newCenter) {
               let lng = newCenter.lng();
               let lat = newCenter.lat();
-              
+
               // Normalize longitude to -180 to 180 for display
               while (lng > 180) {
                 lng -= 360;
@@ -157,7 +176,7 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
               while (lng < -180) {
                 lng += 360;
               }
-              
+
               onRegionSelect(lat, lng);
             }
           }
@@ -305,15 +324,37 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
           strokeColor: '#1E40AF',
           strokeOpacity: 0.5,
           strokeWeight: 10,
-          editable: true, // Allow radius adjustment by dragging edge
-          draggable: false, // Disable center dragging to avoid conflicts
+          editable: !isLocked,
+          draggable: !isLocked,
         });
+
+        searchCircleRef.current.addListener('click', () => {
+          if (isLocked) {
+            onUnlock?.();
+          }
+        });
+
+
 
         // Listen for radius changes (when user drags circle edge)
         circleListenerRef.current = searchCircleRef.current.addListener('radius_changed', () => {
           const newRadius = searchCircleRef.current?.getRadius() || 2000;
+          const currentCenter = searchCircleRef.current?.getCenter();
           onRadiusChange?.(newRadius);
+          if (currentCenter) {
+            onRegionChange?.({ lat: currentCenter.lat(), lng: currentCenter.lng() }, newRadius);
+          }
         });
+
+        // Listen for center changes (dragging)
+        circleCenterChangeListenerRef.current = searchCircleRef.current.addListener('center_changed', () => {
+          const newCenter = searchCircleRef.current?.getCenter();
+          const currentRadius = searchCircleRef.current?.getRadius() || 2000;
+          if (newCenter) {
+            onRegionChange?.({ lat: newCenter.lat(), lng: newCenter.lng() }, currentRadius);
+          }
+        });
+
 
         // Create connection line from start ticker to circle center
         if (!connectionLineRef.current) {
@@ -380,11 +421,11 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
 
         // Create arrows at cardinal directions (0, 90, 180, 270 degrees)
         const angles = [0, 90, 180, 270]; // N, E, S, W
-        
+
         angles.forEach(angle => {
           // Convert angle to radians
           const rad = (angle * Math.PI) / 180;
-          
+
           // Calculate position on circle edge
           const lat = center.lat() + (Math.cos(rad) * radius) / 111000;
           const lng = center.lng() + (Math.sin(rad) * radius) / (111000 * Math.cos((center.lat() * Math.PI) / 180));
@@ -472,35 +513,99 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
       };
     }, [isAreaSelectionMode, startTickerLocation]);
 
+    // Revert button effect
+    useEffect(() => {
+      if (!mapRef.current || !searchCircleRef.current || !startTickerLocation) {
+        if (revertMarkerRef.current) {
+          revertMarkerRef.current.setMap(null);
+          revertMarkerRef.current = null;
+        }
+        return;
+      }
+
+      if (canRevert) {
+        const updateRevertPosition = () => {
+          if (!searchCircleRef.current || !mapRef.current) return;
+          const center = searchCircleRef.current.getCenter();
+          const radius = searchCircleRef.current.getRadius();
+          if (!center) return;
+
+          // Position revert button at the top edge of the circle
+          const lat = center.lat() + (radius / 111000);
+          const lng = center.lng();
+
+          const backArrowSVG = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="40" height="40">
+              <circle cx="50" cy="50" r="45" fill="white" stroke="#1E40AF" stroke-width="5"/>
+              <path d="M70 50 H30 M30 50 L45 35 M30 50 L45 65" stroke="#1E40AF" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          `;
+
+          if (!revertMarkerRef.current) {
+            revertMarkerRef.current = new google.maps.Marker({
+              position: { lat, lng },
+              map: mapRef.current,
+              icon: {
+                url: `data:image/svg+xml;base64,${btoa(backArrowSVG)}`,
+                scaledSize: new google.maps.Size(40, 40),
+                anchor: new google.maps.Point(20, 20),
+              },
+              title: 'Revert to previous region',
+              zIndex: 1000,
+            });
+
+            revertMarkerRef.current.addListener('click', () => {
+              onRevert?.();
+            });
+          } else {
+            revertMarkerRef.current.setPosition({ lat, lng });
+          }
+        };
+
+        updateRevertPosition();
+        const L1 = searchCircleRef.current.addListener('center_changed', updateRevertPosition);
+        const L2 = searchCircleRef.current.addListener('radius_changed', updateRevertPosition);
+
+        return () => {
+          google.maps.event.removeListener(L1);
+          google.maps.event.removeListener(L2);
+        };
+      } else {
+        if (revertMarkerRef.current) {
+          revertMarkerRef.current.setMap(null);
+          revertMarkerRef.current = null;
+        }
+      }
+    }, [canRevert, startTickerLocation, onRevert]);
+
+    // Sync circle with props (for revert feature)
+    useEffect(() => {
+      if (circle && searchCircleRef.current) {
+        const currentCenter = searchCircleRef.current.getCenter();
+        const currentRadius = searchCircleRef.current.getRadius();
+
+        if (currentCenter && (currentCenter.lat() !== circle.center.lat || currentCenter.lng() !== circle.center.lng)) {
+          searchCircleRef.current.setCenter(circle.center);
+        }
+        if (currentRadius !== circle.radiusMeters) {
+          searchCircleRef.current.setRadius(circle.radiusMeters);
+        }
+      }
+    }, [circle]);
+
     // Area selection mode: when circle exists, enable circle dragging
     useEffect(() => {
       if (!mapRef.current || !searchCircleRef.current || !startTickerLocation) return;
 
-      if (isAreaSelectionMode) {
-        // Keep map zoomable and pannable; only make circle draggable
-        mapRef.current.setOptions({
-          draggable: true,
-          scrollwheel: true,
-          doubleClickZoom: true,
-          draggableCursor: 'grab',
-        });
-        searchCircleRef.current.setOptions({ draggable: true });
-      } else {
-        if (circleCenterChangeListenerRef.current) {
-          google.maps.event.removeListener(circleCenterChangeListenerRef.current);
-          circleCenterChangeListenerRef.current = null;
-        }
-        // Keep map zoomable/pannable; circle stays where user left it (no center reset)
-        searchCircleRef.current.setOptions({ draggable: false });
-      }
+      // Sync interactivity with lock state
+      searchCircleRef.current.setOptions({
+        draggable: !isLocked,
+        editable: !isLocked
+      });
 
-      return () => {
-        if (circleCenterChangeListenerRef.current) {
-          google.maps.event.removeListener(circleCenterChangeListenerRef.current);
-          circleCenterChangeListenerRef.current = null;
-        }
-      };
-    }, [isAreaSelectionMode, startTickerLocation]);
+    }, [startTickerLocation, isLocked]);
+
+
 
     // Connection line cleanup happens in circle effect
     // (Connection line is now created when circle is created)
@@ -515,19 +620,48 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
       }
     }, [polygonCoordinates.length]);
 
-    // Update center if it changes externally
+    // Handle marked activities markers
+
     useEffect(() => {
-      if (mapRef.current) {
-        const current = mapRef.current.getCenter();
-        if (
-          current &&
-          (Math.abs(current.lat() - center.lat) > 0.001 ||
-            Math.abs(current.lng() - center.lng) > 0.001)
-        ) {
-          mapRef.current.panTo({ lat: center.lat, lng: center.lng });
+      if (!mapRef.current) return;
+
+      const currentMarkedIds = new Set(markedActivities?.map(a => a.id) || []);
+
+      // Remove markers for activities no longer marked
+      activityMarkersRef.current.forEach((marker, id) => {
+        if (!currentMarkedIds.has(id)) {
+          marker.setMap(null);
+          activityMarkersRef.current.delete(id);
         }
-      }
-    }, [center]);
+      });
+
+      // Add markers for new marked activities
+      markedActivities?.forEach(activity => {
+        if (!activityMarkersRef.current.has(activity.id)) {
+          const marker = new google.maps.Marker({
+            position: { lat: activity.lat, lng: activity.lng },
+            map: mapRef.current!,
+            title: activity.title,
+            animation: google.maps.Animation.DROP,
+            icon: {
+              // Google-style pin path
+              path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
+              fillColor: '#4285F4', // Google Blue
+              fillOpacity: 1,
+              strokeWeight: 1.5,
+              strokeColor: '#FFFFFF',
+              scale: 1.5,
+              anchor: new google.maps.Point(12, 22),
+              labelOrigin: new google.maps.Point(12, 9)
+            }
+          });
+
+          activityMarkersRef.current.set(activity.id, marker);
+        }
+      });
+    }, [markedActivities]);
+
+
 
     // Expose method to add marker at location and fit bounds
     useImperativeHandle(ref, () => ({
@@ -582,7 +716,7 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
             if (!this.div) return;
             const projection = this.getProjection();
             const position = projection.fromLatLngToDivPixel(new google.maps.LatLng(lat, lng));
-            
+
             if (position) {
               // Position pin emoji so bottom tip touches the red marker dot
               this.div!.style.left = position.x - 15 + 'px';
@@ -628,7 +762,7 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
         }
         onPolygonChange([]);
       },
-      setMapClickMode: () => {},
+      setMapClickMode: () => { },
       getCircle: (): { center: LatLng; radiusMeters: number } | null => {
         if (!searchCircleRef.current || !startTickerLocation) return null;
         const center = searchCircleRef.current.getCenter();

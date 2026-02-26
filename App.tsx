@@ -51,6 +51,14 @@ const App: React.FC = () => {
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [favorites, setFavorites] = useState<Activity[]>([]);
+  const [markedActivities, setMarkedActivities] = useState<Activity[]>([]);
+  const [regionHistory, setRegionHistory] = useState<{ center: LatLng; radiusMeters: number }[]>([]);
+  const [isRegionDirty, setIsRegionDirty] = useState(true);
+  const [isRegionLocked, setIsRegionLocked] = useState(false);
+
+
+
+
   // crossfade: 'idle' | 'fading'
 
   const [authTransition, setAuthTransition] = useState<'idle' | 'fading'>('idle');
@@ -113,6 +121,11 @@ const App: React.FC = () => {
       // Set new start location and enter area selection mode
       setStartTickerLocation({ lat, lng });
       setIsAreaSelectionMode(true);
+      setRegionHistory([]);
+      setIsRegionDirty(true);
+      setIsRegionLocked(false);
+
+
 
       // Place the ticker symbol on the map
       mapContainerRef.current?.addMarkerAtLocation(lat, lng, locationName, [[lat - 0.01, lng - 0.01], [lat + 0.01, lng + 0.01]]);
@@ -139,8 +152,13 @@ const App: React.FC = () => {
         setActivities(results);
       } finally {
         setIsLoading(false);
+        setIsRegionDirty(false); // Clean state after search
+        setIsRegionLocked(true); // Lock it
       }
       setIsSidebarOpen(true);
+
+
+
     },
     [circle]
   );
@@ -182,40 +200,91 @@ const App: React.FC = () => {
     // Screen 1: No start location → enter area selection mode (Screen 2)
     if (!startTickerLocation) {
       setIsAreaSelectionMode(true);
+      return;
     }
-    // Screen 2: Start location + in area selection mode → search activities (Screen 3)
-    else if (startTickerLocation && isAreaSelectionMode) {
-      const circleData = mapContainerRef.current?.getCircle();
-      if (circleData) {
-        setCircle(circleData);
-        setIsAreaSelectionMode(false);
-        const query = searchQuery || 'things to do';
-        setIsSidebarOpen(true);
 
-        setIsLoading(true);
-        setError(null);
-        try {
-          const results = await searchNearbyActivities({
-            lat: circleData.center.lat,
-            lng: circleData.center.lng,
-            radiusMeters: circleData.radiusMeters,
-            query,
-          });
-          setActivities(results);
-        } catch (err) {
-          const message = err instanceof Error ? err.message : 'Issue retrieving places';
-          setError(message);
-          setActivities([]);
-        } finally {
-          setIsLoading(false);
+    // Capture current region for history before updating or searching
+    const circleData = mapContainerRef.current?.getCircle();
+
+    // If we have a circle, we're either performing a new search or moving
+    // In both cases, if the user "Searches", they are committing to this location
+    if (circleData) {
+      // Only push to history if it's different from the last one (basic check)
+      setRegionHistory(prev => {
+        const last = prev[prev.length - 1];
+        if (last && last.center.lat === circleData.center.lat &&
+          last.center.lng === circleData.center.lng &&
+          last.radiusMeters === circleData.radiusMeters) {
+          return prev;
         }
+        return [...prev, circleData];
+      });
+
+      setCircle(circleData);
+      setIsAreaSelectionMode(false); // Ensure we stay in "interactive" mode but maybe hide placement tools
+
+      const query = searchQuery || 'things to do';
+      setIsSidebarOpen(true);
+      setIsLoading(true);
+      setError(null);
+      try {
+        const results = await searchNearbyActivities({
+          lat: circleData.center.lat,
+          lng: circleData.center.lng,
+          radiusMeters: circleData.radiusMeters,
+          query,
+        });
+        setActivities(results);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Issue retrieving places';
+        setError(message);
+        setActivities([]);
+      } finally {
+        setIsLoading(false);
+        setIsRegionDirty(false); // Clean state after search
+        setIsRegionLocked(true); // Lock it
+      }
+    } else if (startTickerLocation && isAreaSelectionMode) {
+
+
+
+      // First time placement
+      const newCircleData = mapContainerRef.current?.getCircle();
+      if (newCircleData) {
+        setCircle(newCircleData);
+        setIsAreaSelectionMode(false);
       }
     }
-    // Screen 3: Circle exists + NOT in area selection mode → enter move mode (back to Screen 2)
-    else if (hasSearchArea && !isAreaSelectionMode) {
-      setIsAreaSelectionMode(true);
-    }
-  }, [startTickerLocation, isAreaSelectionMode, searchQuery, hasSearchArea]);
+  }, [startTickerLocation, isAreaSelectionMode, searchQuery]);
+
+  const handleRevertRegion = useCallback(() => {
+    setRegionHistory(prev => {
+      if (prev.length === 0) return prev;
+      const newHistory = [...prev];
+      const previousRegion = newHistory.pop();
+      if (previousRegion) {
+        setCircle(previousRegion);
+        // We'll need a way to tell MapContainer to update its circle
+        // For now, setting 'circle' should trigger a prop update if we wire it
+      }
+      return newHistory;
+    });
+  }, []);
+
+  const handleRegionChange = useCallback(() => {
+    setIsRegionDirty(true);
+    setIsRegionLocked(false); // Unlock if manually manipulated (though UI should prevent)
+  }, []);
+
+  const handleRegionUnlock = useCallback(() => {
+    setIsRegionLocked(false);
+    setIsRegionDirty(true); // Switch to "Search This Area" (Blue)
+  }, []);
+
+
+
+
+
 
   const toggleFavorite = useCallback((activity: Activity) => {
     setFavorites((prev) => {
@@ -227,6 +296,17 @@ const App: React.FC = () => {
     });
   }, []);
 
+  const toggleMarkedActivity = useCallback((activity: Activity) => {
+    setMarkedActivities((prev) => {
+      const isMarked = prev.some((a) => a.id === activity.id);
+      if (isMarked) {
+        return prev.filter((a) => a.id !== activity.id);
+      }
+      return [...prev, activity];
+    });
+  }, []);
+
+
   const handleReset = useCallback(() => {
 
 
@@ -237,9 +317,14 @@ const App: React.FC = () => {
     setActivities([]);
     setIsAreaSelectionMode(false);
     setSearchQuery('');
+    setRegionHistory([]);
+    setIsRegionDirty(true);
+    setIsRegionLocked(false);
 
     setIsSidebarOpen(false);
+
   }, []);
+
 
   /** Called by AuthOverlay when credentials are confirmed. Runs the crossfade. */
   const handleAuthenticate = useCallback(() => {
@@ -292,7 +377,18 @@ const App: React.FC = () => {
                 onMapClickForPlacement={handleMapClickForPlacement}
                 startTickerLocation={startTickerLocation}
                 onRadiusChange={handleRadiusChange}
+                onRegionChange={handleRegionChange}
+                markedActivities={markedActivities}
+                circle={circle}
+                onRevert={handleRevertRegion}
+                canRevert={regionHistory.length > 0}
+                isLocked={isRegionLocked}
+                onUnlock={handleRegionUnlock}
               />
+
+
+
+
 
               <Sidebar
                 isOpen={isSidebarOpen}
@@ -304,8 +400,11 @@ const App: React.FC = () => {
                 onViewDetails={setSelectedActivity}
                 favorites={favorites}
                 onToggleFavorite={toggleFavorite}
+                markedActivityIds={markedActivities.map(a => a.id)}
+                onToggleMark={toggleMarkedActivity}
                 error={error}
               />
+
 
 
               {selectedActivity && (
@@ -354,17 +453,18 @@ const App: React.FC = () => {
 
                 {/* Main action button */}
                 <button
-                  onClick={handleSetSearchAreaClick}
+                  onClick={!isRegionDirty && isRegionLocked ? handleRegionUnlock : handleSetSearchAreaClick}
+
                   disabled={isAreaSelectionMode && !startTickerLocation}
-                  className={`px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 transform hover:scale-105 active:scale-95 transition-colors disabled:opacity-70 disabled:cursor-not-allowed ${hasSearchArea && !isAreaSelectionMode
-                    ? 'bg-slate-600 hover:bg-slate-700 text-white'
-                    : startTickerLocation && isAreaSelectionMode
-                      ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                      : isAreaSelectionMode
-                        ? 'bg-indigo-500 hover:bg-indigo-600 text-white'
-                        : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                  className={`px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-3 transform hover:scale-105 active:scale-95 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed ${!isRegionDirty && isRegionLocked
+                    ? 'bg-emerald-400 hover:bg-emerald-500 text-white shadow-emerald-500/30'
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white ring-4 ring-indigo-500/20'
                     }`}
+
                 >
+
+
+
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-5 w-5"
@@ -377,12 +477,14 @@ const App: React.FC = () => {
                       clipRule="evenodd"
                     />
                   </svg>
-                  {hasSearchArea && !isAreaSelectionMode
-                    ? 'Move Region'
-                    : startTickerLocation && isAreaSelectionMode
-                      ? 'Search This Area'
-                      : 'Set Search Area'}
+                  {!startTickerLocation
+                    ? 'Set Search Area'
+                    : !isRegionDirty && isRegionLocked
+                      ? 'Adjust Region'
+                      : 'Search This Area'}
+
                 </button>
+
 
                 {/* Show "Clear" button if a location is selected or if search results are displayed */}
                 {(hasSearchArea || startTickerLocation) && (

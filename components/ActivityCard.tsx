@@ -7,9 +7,20 @@ interface ActivityCardProps {
   onViewDetails: (activity: Activity) => void;
   isFavorite?: boolean;
   onToggleFavorite?: (activity: Activity) => void;
+  isMarked?: boolean;
+  onToggleMark?: (activity: Activity) => void;
 }
 
-const ActivityCard: React.FC<ActivityCardProps> = ({ activity, onViewDetails, isFavorite, onToggleFavorite }) => {
+
+const ActivityCard: React.FC<ActivityCardProps> = ({
+  activity,
+  onViewDetails,
+  isFavorite,
+  onToggleFavorite,
+  isMarked,
+  onToggleMark
+}) => {
+
   const [isPumping, setIsPumping] = React.useState(false);
 
   const handleFavoriteClick = (e: React.MouseEvent) => {
@@ -20,6 +31,14 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, onViewDetails, is
       setTimeout(() => setIsPumping(false), 300);
     }
   };
+
+  const handleMarkClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onToggleMark) {
+      onToggleMark(activity);
+    }
+  };
+
 
   return (
     <div
@@ -99,14 +118,23 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, onViewDetails, is
         <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
           {activity.category}
         </span>
-        <div
-          className="text-xs font-bold text-indigo-600 group-hover:text-indigo-700 transition-colors flex items-center gap-1 group/btn"
+        <button
+          onClick={handleMarkClick}
+          className={`text-xs font-bold transition-all flex items-center gap-1 group/btn px-3 py-1.5 rounded-lg ${isMarked
+              ? 'bg-red-50 text-red-600 hover:bg-red-100'
+              : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+            }`}
         >
-          Click to view details
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 group-hover/btn:translate-x-0.5 transition-transform" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+          {isMarked ? 'Remove mark from map' : 'Mark on map'}
+          <svg xmlns="http://www.w3.org/2000/svg" className={`h-3.5 w-3.5 transition-transform ${isMarked ? 'rotate-45' : 'group-hover/btn:scale-110'}`} viewBox="0 0 20 20" fill="currentColor">
+            {isMarked ? (
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            ) : (
+              <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+            )}
           </svg>
-        </div>
+        </button>
+
       </div>
     </div>
 

@@ -61,7 +61,10 @@ export async function searchNearbyActivities(params: {
       title: p.name,
       description: p.address ?? '',
       uri: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.lat + ',' + p.lng)}`,
+      lat: p.lat,
+      lng: p.lng,
       category: inferCategory(p.types),
+
       rating: p.rating,
       userRatingCount: p.userRatingCount,
       priceLevel: p.priceLevel,
