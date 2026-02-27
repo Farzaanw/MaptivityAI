@@ -408,6 +408,10 @@ const App: React.FC = () => {
                 onRadiusChange={handleRadiusChange}
                 onRegionChange={handleRegionChange}
                 markedActivities={markedActivities}
+                onActivityClick={(activity) => {
+                  setSelectedActivity(activity);
+                  setIsSidebarOpen(true);
+                }}
                 circle={circle}
                 onRevert={handleRevertRegion}
                 canRevert={regionHistory.length > 0}
