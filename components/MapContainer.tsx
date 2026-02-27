@@ -56,7 +56,8 @@ interface MapContainerProps {
   startTickerLocation: { lat: number; lng: number } | null;
   onRadiusChange?: (radiusMeters: number) => void;
   onRegionChange?: (center: LatLng, radiusMeters: number) => void;
-  markedActivities?: any[]; // Using any[] to avoid circular dependency if Activity isn't imported
+  markedActivities?: any[];
+  onActivityClick?: (activity: any) => void;
 
   circle?: { center: LatLng; radiusMeters: number } | null;
   onRevert?: () => void;
@@ -87,7 +88,7 @@ function pathToCoordinates(path: google.maps.MVCArray<google.maps.LatLng>): LatL
 }
 
 const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
-  ({ onRegionSelect, center, polygonCoordinates, onPolygonChange, isDrawingMode, onDrawingModeChange, isAreaSelectionMode, onMapClickForPlacement, startTickerLocation, onRadiusChange, onRegionChange, markedActivities, circle, onRevert, canRevert, isLocked, onUnlock }, ref) => {
+  ({ onRegionSelect, center, polygonCoordinates, onPolygonChange, isDrawingMode, onDrawingModeChange, isAreaSelectionMode, onMapClickForPlacement, startTickerLocation, onRadiusChange, onRegionChange, markedActivities, onActivityClick, topActivities, circle, onRevert, canRevert, isLocked, onUnlock }, ref) => {
 
 
 
@@ -110,7 +111,8 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
     const circleArrowMarkersRef = useRef<google.maps.Marker[]>([]);
     const circleArrowListenerRef = useRef<google.maps.MapsEventListener | null>(null);
     const revertMarkerRef = useRef<google.maps.Marker | null>(null);
-    const activityMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
+    const activityMarkersRef = useRef<Map<string, google.maps.OverlayView>>(new Map());
+    const activityPopupOverlaysRef = useRef<Map<string, google.maps.OverlayView>>(new Map());
 
     const [mapType, setMapType] = React.useState<'roadmap' | 'satellite'>('roadmap');
 
@@ -620,48 +622,195 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
       }
     }, [polygonCoordinates.length]);
 
-    // Handle marked activities markers
-
+    // Handle marked activities — rich card overlays
     useEffect(() => {
       if (!mapRef.current) return;
 
-      const currentMarkedIds = new Set(markedActivities?.map(a => a.id) || []);
+      const currentMarkedIds = new Set(markedActivities?.map((a: any) => a.id) || []);
 
-      // Remove markers for activities no longer marked
-      activityMarkersRef.current.forEach((marker, id) => {
+      // Remove overlays for activities no longer marked
+      activityMarkersRef.current.forEach((overlay, id) => {
         if (!currentMarkedIds.has(id)) {
-          marker.setMap(null);
+          overlay.setMap(null);
           activityMarkersRef.current.delete(id);
         }
       });
 
-      // Add markers for new marked activities
-      markedActivities?.forEach(activity => {
-        if (!activityMarkersRef.current.has(activity.id)) {
-          const marker = new google.maps.Marker({
-            position: { lat: activity.lat, lng: activity.lng },
-            map: mapRef.current!,
-            title: activity.title,
-            animation: google.maps.Animation.DROP,
-            icon: {
-              // Google-style pin path
-              path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
-              fillColor: '#4285F4', // Google Blue
-              fillOpacity: 1,
-              strokeWeight: 1.5,
-              strokeColor: '#FFFFFF',
-              scale: 1.5,
-              anchor: new google.maps.Point(12, 22),
-              labelOrigin: new google.maps.Point(12, 9)
+      // Add overlays for newly marked activities
+      markedActivities?.forEach((activity: any) => {
+        if (activityMarkersRef.current.has(activity.id)) return;
+
+        const { id, title, lat, lng, photoUrl, rating } = activity;
+        const stars = rating ? Math.round(rating) : 0;
+
+        const starsSVG = [1, 2, 3, 4, 5].map((s) => {
+          const filled = s <= stars;
+          return `<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 20 20" fill="${filled ? '#FBBF24' : '#D1D5DB'}"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>`;
+        }).join('');
+
+        class MarkedActivityOverlay extends google.maps.OverlayView {
+          private container: HTMLDivElement | null = null;
+
+          onAdd() {
+            const div = document.createElement('div');
+            div.style.cssText = `
+              position: absolute;
+              cursor: pointer;
+              user-select: none;
+              transition: transform 0.15s ease, filter 0.15s ease;
+              filter: drop-shadow(0 4px 10px rgba(0,0,0,0.28));
+              transform-origin: bottom center;
+            `;
+
+            div.innerHTML = `
+              <div style="
+                background: white;
+                border-radius: 10px;
+                overflow: hidden;
+                width: 140px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+              ">
+                ${photoUrl
+                  ? `<div style="width:140px;height:70px;overflow:hidden;"><img src="${photoUrl}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" /></div>`
+                  : `<div style="width:140px;height:70px;background:linear-gradient(135deg,#EEF2FF,#C7D2FE);display:flex;align-items:center;justify-content:center;">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#6366F1" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    </div>`
+                }
+                <div style="padding:6px 8px 7px;">
+                  <div style="font-size:11px;font-weight:700;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;" title="${title.replace(/"/g, '&quot;')}">${title}</div>
+                  <div style="display:flex;align-items:center;gap:1px;">${starsSVG}${rating ? `<span style="font-size:9px;font-weight:600;color:#6B7280;margin-left:3px;">${rating.toFixed(1)}</span>` : ''}</div>
+                </div>
+                <div style="position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:7px solid white;"></div>
+              </div>
+            `;
+
+            div.addEventListener('mouseenter', () => {
+              div.style.transform = 'scale(1.06)';
+              div.style.filter = 'drop-shadow(0 6px 16px rgba(0,0,0,0.35))';
+            });
+            div.addEventListener('mouseleave', () => {
+              div.style.transform = 'scale(1)';
+              div.style.filter = 'drop-shadow(0 4px 10px rgba(0,0,0,0.28))';
+            });
+            div.addEventListener('click', () => {
+              onActivityClick?.(activity);
+            });
+
+            this.container = div;
+            this.getPanes()!.floatPane.appendChild(div);
+          }
+
+          draw() {
+            if (!this.container) return;
+            const pos = this.getProjection().fromLatLngToDivPixel(
+              new google.maps.LatLng(lat, lng)
+            );
+            if (pos) {
+              this.container.style.left = (pos.x - 70) + 'px';
+              this.container.style.top = (pos.y - 115) + 'px';
             }
-          });
+          }
 
-          activityMarkersRef.current.set(activity.id, marker);
+          onRemove() {
+            if (this.container) {
+              this.container.parentNode?.removeChild(this.container);
+              this.container = null;
+            }
+          }
         }
+
+        const overlay = new MarkedActivityOverlay();
+        overlay.setMap(mapRef.current!);
+        activityMarkersRef.current.set(id, overlay);
       });
-    }, [markedActivities]);
+    }, [markedActivities, onActivityClick]);
 
 
+
+    // Top-5 activity popup overlays
+    useEffect(() => {
+      if (!mapRef.current) return;
+
+      activityPopupOverlaysRef.current.forEach((overlay) => overlay.setMap(null));
+      activityPopupOverlaysRef.current.clear();
+
+      if (!topActivities || topActivities.length === 0) return;
+
+      const PRICE_SYMBOLS = ['', '$', '$$', '$$$', '$$$$'];
+
+      topActivities.forEach((activity) => {
+        const { id, title, lat, lng, rank, rating, priceLevel, photoUrl } = activity;
+
+        const stars = rating ? Math.round(rating) : 0;
+        const priceStr = priceLevel && priceLevel >= 1 && priceLevel <= 4 ? PRICE_SYMBOLS[priceLevel] : '';
+
+        const starsSVG = [1, 2, 3, 4, 5].map((s) => {
+          const filled = s <= stars;
+          return `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 20 20" fill="${filled ? '#FBBF24' : '#E5E7EB'}"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>`;
+        }).join('');
+
+        const rankColors = ['#6366F1', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981'];
+        const rankColor = rankColors[(rank - 1) % rankColors.length];
+
+        class ActivityPopup extends google.maps.OverlayView {
+          private container: HTMLDivElement | null = null;
+
+          onAdd() {
+            const div = document.createElement('div');
+            div.style.cssText = `position:absolute;cursor:pointer;user-select:none;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.25));transition:transform 0.15s ease;`;
+
+            div.innerHTML = `
+              <div style="background:white;border-radius:12px;overflow:hidden;width:160px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;position:relative;">
+                <div style="position:absolute;top:6px;left:6px;width:22px;height:22px;background:${rankColor};border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:800;z-index:2;box-shadow:0 1px 4px rgba(0,0,0,0.3);">${rank}</div>
+                ${photoUrl
+                  ? `<img src="${photoUrl}" alt="" style="width:160px;height:80px;object-fit:cover;display:block;" />`
+                  : `<div style="width:160px;height:80px;background:linear-gradient(135deg,#EEF2FF,#E0E7FF);display:flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#6366F1" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>`
+                }
+                <div style="padding:7px 8px 8px;">
+                  <div style="font-size:11px;font-weight:700;color:#111827;line-height:1.3;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${title.replace(/"/g, '&quot;')}">${title}</div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <div style="display:flex;align-items:center;gap:1px;">${starsSVG}${rating ? `<span style="font-size:9px;font-weight:700;color:#6B7280;margin-left:3px;">${rating.toFixed(1)}</span>` : ''}</div>
+                    ${priceStr ? `<span style="font-size:11px;font-weight:700;color:#059669;">${priceStr}</span>` : ''}
+                  </div>
+                </div>
+                <div style="position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid white;"></div>
+              </div>
+            `;
+
+            div.addEventListener('mouseenter', () => { div.style.transform = 'scale(1.04)'; });
+            div.addEventListener('mouseleave', () => { div.style.transform = 'scale(1)'; });
+
+            this.container = div;
+            this.getPanes()!.floatPane.appendChild(div);
+          }
+
+          draw() {
+            if (!this.container) return;
+            const pos = this.getProjection().fromLatLngToDivPixel(new google.maps.LatLng(lat, lng));
+            if (pos) {
+              this.container.style.left = (pos.x - 80) + 'px';
+              this.container.style.top = (pos.y - 120) + 'px';
+            }
+          }
+
+          onRemove() {
+            if (this.container) {
+              this.container.parentNode?.removeChild(this.container);
+              this.container = null;
+            }
+          }
+        }
+
+        const overlay = new ActivityPopup();
+        overlay.setMap(mapRef.current);
+        activityPopupOverlaysRef.current.set(id, overlay);
+      });
+
+      return () => {
+        activityPopupOverlaysRef.current.forEach((overlay) => overlay.setMap(null));
+        activityPopupOverlaysRef.current.clear();
+      };
+    }, [topActivities]);
 
     // Expose method to add marker at location and fit bounds
     useImperativeHandle(ref, () => ({
