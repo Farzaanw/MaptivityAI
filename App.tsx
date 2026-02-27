@@ -56,31 +56,43 @@ const App: React.FC = () => {
   const [isRegionDirty, setIsRegionDirty] = useState(true);
   const [isRegionLocked, setIsRegionLocked] = useState(false);
 
-
-
+  // Create a broadcast channel for cross-tab communication
+  const authChannel = useRef<BroadcastChannel | null>(null);
 
   // crossfade: 'idle' | 'fading'
-
   const [authTransition, setAuthTransition] = useState<'idle' | 'fading'>('idle');
 
 
   useEffect(() => {
+    // Set up BroadcastChannel
+    authChannel.current = new BroadcastChannel('maptivity_auth_handoff');
+    authChannel.current.onmessage = (event) => {
+      if (event.data.type === 'TRIGGER_RESET_OVERLAY') {
+        // Another tab has requested to show the reset overlay.
+        setIsResettingPassword(true);
+        window.focus();
+      }
+    };
+
     // Initial session check
     getSession().then((session) => {
       setIsAuthenticated(!!session);
     });
 
-    // Listen for auth events (e.g. sign in, sign out, OAuth redirect)
     const { data: { subscription } } = onAuthStateChange((event, session) => {
       setIsAuthenticated(!!session);
 
       if (event === 'PASSWORD_RECOVERY') {
+        // Immediately show the overlay in this tab
         setIsResettingPassword(true);
+        // And notify all other tabs to do the same
+        authChannel.current?.postMessage({ type: 'TRIGGER_RESET_OVERLAY' });
       }
     });
 
     return () => {
       subscription.unsubscribe();
+      authChannel.current?.close();
     };
   }, []);
 
@@ -345,6 +357,23 @@ const App: React.FC = () => {
 
   const showOverlay = (!isAuthenticated && !isGuestMode) || authTransition === 'fading';
 
+  if (isResettingPassword) {
+    return (
+      <React.Suspense fallback={
+        <div className="h-screen w-full flex items-center justify-center bg-gray-50">
+          <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      }>
+        <ResetPasswordOverlay
+          onDone={() => {
+            setIsResettingPassword(false);
+            setIsAuthenticated(true);
+          }}
+        />
+      </React.Suspense>
+    );
+  }
+
   return (
     <div className="relative h-screen w-full flex flex-col overflow-hidden font-sans">
       <Header activePage={activePage} onNavigate={setActivePage} />
@@ -542,16 +571,6 @@ const App: React.FC = () => {
                 onGuestLogin={handleGuestLogin}
               />
             </div>
-          )}
-
-          {/* Password reset overlay — shown when user clicks reset link in email */}
-          {isResettingPassword && (
-            <ResetPasswordOverlay
-              onDone={() => {
-                setIsResettingPassword(false);
-                setIsAuthenticated(true);
-              }}
-            />
           )}
         </React.Suspense>
       </main>
