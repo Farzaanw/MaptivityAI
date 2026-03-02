@@ -19,6 +19,8 @@ export interface Activity {
   userRatingCount?: number;
   priceLevel?: number;
   photoUrl?: string;
+  types?: string[];
+  isOpen?: boolean;
 }
 
 export interface PlaceDetails {

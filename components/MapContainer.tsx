@@ -111,6 +111,8 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
     const circleArrowListenerRef = useRef<google.maps.MapsEventListener | null>(null);
     const revertMarkerRef = useRef<google.maps.Marker | null>(null);
     const activityMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
+    const temporaryMarkerRef = useRef<google.maps.OverlayView | null>(null);
+    const temporaryMarkerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const [mapType, setMapType] = React.useState<'roadmap' | 'satellite'>('roadmap');
 
@@ -635,28 +637,125 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
         }
       });
 
-      // Add markers for new marked activities
+      // Add/Update markers for marked activities
       markedActivities?.forEach(activity => {
         if (!activityMarkersRef.current.has(activity.id)) {
-          const marker = new google.maps.Marker({
-            position: { lat: activity.lat, lng: activity.lng },
-            map: mapRef.current!,
-            title: activity.title,
-            animation: google.maps.Animation.DROP,
-            icon: {
-              // Google-style pin path
-              path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
-              fillColor: '#4285F4', // Google Blue
-              fillOpacity: 1,
-              strokeWeight: 1.5,
-              strokeColor: '#FFFFFF',
-              scale: 1.5,
-              anchor: new google.maps.Point(12, 22),
-              labelOrigin: new google.maps.Point(12, 9)
-            }
-          });
+          class ActivityMarkerOverlay extends google.maps.OverlayView {
+            private div: HTMLElement | null = null;
+            private tooltip: HTMLElement | null = null;
 
-          activityMarkersRef.current.set(activity.id, marker);
+            constructor(private activity: any, private map: google.maps.Map) {
+              super();
+              this.setMap(map);
+            }
+
+            onAdd() {
+              this.div = document.createElement('div');
+              this.div.style.position = 'absolute';
+              this.div.style.cursor = 'pointer';
+              this.div.style.zIndex = '10';
+
+              // Marker element (Google-style pin)
+              const pin = document.createElement('div');
+              pin.className = 'activity-pin';
+              pin.style.width = '30px';
+              pin.style.height = '40px';
+              pin.style.backgroundImage = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23000000"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>')`;
+              pin.style.backgroundSize = 'contain';
+              pin.style.backgroundRepeat = 'no-repeat';
+              pin.style.transformOrigin = 'bottom center';
+              pin.style.animation = 'marker-bob 2s ease-in-out infinite';
+
+              // Tooltip element (hidden by default)
+              this.tooltip = document.createElement('div');
+              this.tooltip.className = 'activity-tooltip';
+              this.tooltip.style.position = 'absolute';
+              this.tooltip.style.bottom = '45px';
+              this.tooltip.style.left = '50%';
+              this.tooltip.style.transform = 'translateX(-50%) scale(0.95)';
+              this.tooltip.style.opacity = '0';
+              this.tooltip.style.visibility = 'hidden';
+              this.tooltip.style.backgroundColor = 'white';
+              this.tooltip.style.borderRadius = '12px';
+              this.tooltip.style.boxShadow = '0 10px 25px rgba(0,0,0,0.2)';
+              this.tooltip.style.width = '200px';
+              this.tooltip.style.padding = '8px';
+              this.tooltip.style.transition = 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+              this.tooltip.style.zIndex = '100';
+              this.tooltip.style.pointerEvents = 'none';
+
+              const ratingStars = this.activity.rating
+                ? `<div style="display: flex; gap: 2px;">${Array.from({ length: 5 }, (_, i) =>
+                  `<svg style="width: 12px; height: 12px; color: ${i < Math.round(this.activity.rating) ? '#FBBF24' : '#E5E7EB'}" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>`
+                ).join('')}</div>`
+                : '';
+
+              const statusColor = this.activity.isOpen ? '#10B981' : '#EF4444';
+              const statusText = this.activity.isOpen !== undefined ? (this.activity.isOpen ? 'Open Now' : 'Closed') : '';
+
+              this.tooltip.innerHTML = `
+                ${this.activity.photoUrl ? `<img src="${this.activity.photoUrl}" style="width: 100%; height: 80px; object-fit: cover; border-radius: 8px; margin-bottom: 8px;" />` : ''}
+                <div style="font-weight: 700; font-size: 13px; color: #1F2937; margin-bottom: 2px; line-height: 1.2;">${this.activity.title}</div>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                  ${ratingStars}
+                  <span style="font-size: 10px; font-weight: 600; color: ${statusColor};">${statusText}</span>
+                </div>
+                <div style="font-size: 10px; color: #6B7280; text-transform: capitalize;">${this.activity.category || 'Location'}</div>
+              `;
+
+              // Animations Styles
+              if (!document.getElementById('marker-animation-style')) {
+                const style = document.createElement('style');
+                style.id = 'marker-animation-style';
+                style.textContent = `
+                  @keyframes marker-bob {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-8px); }
+                  }
+                `;
+                document.head.appendChild(style);
+              }
+
+              this.div.appendChild(this.tooltip);
+              this.div.appendChild(pin);
+
+              this.div.onmouseover = () => {
+                this.tooltip!.style.opacity = '1';
+                this.tooltip!.style.visibility = 'visible';
+                this.tooltip!.style.transform = 'translateX(-50%) scale(1)';
+                this.div!.style.zIndex = '1000';
+              };
+              this.div.onmouseout = () => {
+                this.tooltip!.style.opacity = '0';
+                this.tooltip!.style.visibility = 'hidden';
+                this.tooltip!.style.transform = 'translateX(-50%) scale(0.95)';
+                this.div!.style.zIndex = '10';
+              };
+
+              const panes = this.getPanes()!;
+              panes.overlayMouseTarget.appendChild(this.div);
+            }
+
+            draw() {
+              if (!this.div) return;
+              const projection = this.getProjection();
+              const pos = projection.fromLatLngToDivPixel(new google.maps.LatLng(this.activity.lat, this.activity.lng));
+              if (pos) {
+                this.div.style.left = pos.x - 15 + 'px';
+                this.div.style.top = pos.y - 40 + 'px';
+              }
+            }
+
+            onRemove() {
+              if (this.div) {
+                this.div.parentNode?.removeChild(this.div);
+                this.div = null;
+              }
+            }
+          }
+
+          const overlay = new ActivityMarkerOverlay(activity, mapRef.current!);
+          activityMarkersRef.current.set(activity.id, overlay as any);
         }
       });
     }, [markedActivities]);
@@ -808,6 +907,89 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
       panToLocation: (lat: number, lng: number) => {
         if (mapRef.current) {
           mapRef.current.panTo({ lat, lng });
+        }
+      },
+      showTemporaryMarker: (lat: number, lng: number) => {
+        if (!mapRef.current) return;
+
+        // Clear existing
+        if (temporaryMarkerRef.current) {
+          temporaryMarkerRef.current.setMap(null);
+          temporaryMarkerRef.current = null;
+        }
+        if (temporaryMarkerTimeoutRef.current) {
+          clearTimeout(temporaryMarkerTimeoutRef.current);
+        }
+
+        class PulseOverlay extends google.maps.OverlayView {
+          private div: HTMLElement | null = null;
+          constructor(private position: google.maps.LatLng) {
+            super();
+          }
+
+          onAdd() {
+            const panes = this.getPanes()!;
+            this.div = document.createElement('div');
+            this.div.style.position = 'absolute';
+            this.div.style.transform = 'translate(-50%, -50%)';
+
+            // Pulse element
+            const pulse = document.createElement('div');
+            pulse.style.width = '20px';
+            pulse.style.height = '20px';
+            pulse.style.borderRadius = '50%';
+            pulse.style.backgroundColor = '#FF3D00';
+            pulse.style.boxShadow = '0 0 0 0 rgba(255, 61, 0, 0.7)';
+            pulse.style.animation = 'search-pulse 2s infinite';
+
+            // Add style if it doesn't exist
+            if (!document.getElementById('search-pulse-style')) {
+              const style = document.createElement('style');
+              style.id = 'search-pulse-style';
+              style.textContent = `
+                @keyframes search-pulse {
+                  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 61, 0, 0.7); }
+                  70% { transform: scale(1.1); box-shadow: 0 0 0 20px rgba(255, 61, 0, 0); }
+                  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 61, 0, 0); }
+                }
+              `;
+              document.head.appendChild(style);
+            }
+
+            this.div.appendChild(pulse);
+            panes.overlayMouseTarget.appendChild(this.div);
+          }
+
+          draw() {
+            if (!this.div) return;
+            const projection = this.getProjection();
+            const pos = projection.fromLatLngToDivPixel(this.position);
+            if (pos) {
+              this.div.style.left = pos.x + 'px';
+              this.div.style.top = pos.y + 'px';
+            }
+          }
+
+          onRemove() {
+            if (this.div) {
+              this.div.parentNode?.removeChild(this.div);
+              this.div = null;
+            }
+          }
+        }
+
+        const overlay = new PulseOverlay(new google.maps.LatLng(lat, lng));
+        overlay.setMap(mapRef.current);
+        temporaryMarkerRef.current = overlay;
+      },
+      clearTemporaryMarker: () => {
+        if (temporaryMarkerRef.current) {
+          temporaryMarkerRef.current.setMap(null);
+          temporaryMarkerRef.current = null;
+        }
+        if (temporaryMarkerTimeoutRef.current) {
+          clearTimeout(temporaryMarkerTimeoutRef.current);
+          temporaryMarkerTimeoutRef.current = null;
         }
       },
     }));

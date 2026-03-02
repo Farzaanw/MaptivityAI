@@ -69,6 +69,7 @@ export async function searchNearbyActivities(params: {
       userRatingCount: p.userRatingCount,
       priceLevel: p.priceLevel,
       photoUrl: p.photoUrl ? `${baseUrl}/api/places/photo/${p.photoUrl}` : undefined,
+      types: p.types,
     }));
   } catch (error) {
     console.error('[placesService] Error fetching places:', error);

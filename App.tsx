@@ -13,6 +13,7 @@ const ResetPasswordOverlay = React.lazy(() => import('./components/ResetPassword
 const PlannerPage = React.lazy(() => import('./components/PlannerPage'));
 const FavoritesPage = React.lazy(() => import('./components/FavoritesPage'));
 const DetailsSidebar = React.lazy(() => import('./components/DetailsSidebar'));
+import Toast from './components/Toast';
 
 
 import { Activity } from './types';
@@ -61,6 +62,8 @@ const App: React.FC = () => {
 
   // crossfade: 'idle' | 'fading'
   const [authTransition, setAuthTransition] = useState<'idle' | 'fading'>('idle');
+
+  const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
 
 
   useEffect(() => {
@@ -118,6 +121,7 @@ const App: React.FC = () => {
       setCurrentLocation({ lat, lng });
       if (mapContainerRef.current) {
         mapContainerRef.current.panToLocation(lat, lng);
+        mapContainerRef.current.showTemporaryMarker(lat, lng);
       }
     },
     []
@@ -145,6 +149,7 @@ const App: React.FC = () => {
       // Minimize both sidebars
       setIsSidebarOpen(false);
       setIsLocationSearchMinimized(true);
+      mapContainerRef.current?.clearTemporaryMarker();
     },
     []
   );
@@ -209,6 +214,9 @@ const App: React.FC = () => {
   }, []);
 
   const handleSetSearchAreaClick = useCallback(async () => {
+    // Clear temporary marker if any
+    mapContainerRef.current?.clearTemporaryMarker();
+
     // Screen 1: No start location → enter area selection mode (Screen 2)
     if (!startTickerLocation) {
       setIsAreaSelectionMode(true);
@@ -302,8 +310,10 @@ const App: React.FC = () => {
     setFavorites((prev) => {
       const isAlreadyFav = prev.some((f) => f.id === activity.id);
       if (isAlreadyFav) {
+        setToast({ message: 'Removed from favorites', visible: true });
         return prev.filter((f) => f.id !== activity.id);
       }
+      setToast({ message: 'Saved to Favorites', visible: true });
       return [...prev, activity];
     });
   }, []);
@@ -324,6 +334,7 @@ const App: React.FC = () => {
 
     // Reset everything back to Screen 1
     mapContainerRef.current?.clearSearchCircle();
+    mapContainerRef.current?.clearTemporaryMarker();
     setStartTickerLocation(null);
     setCircle(null);
     setActivities([]);
@@ -575,6 +586,11 @@ const App: React.FC = () => {
         </React.Suspense>
       </main>
 
+      <Toast
+        message={toast.message}
+        isVisible={toast.visible}
+        onClose={() => setToast(prev => ({ ...prev, visible: false }))}
+      />
     </div>
   );
 };
