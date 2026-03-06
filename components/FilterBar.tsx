@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { SortOption } from '../types';
 
 export interface FilterState {
     distance: number;
@@ -8,6 +9,8 @@ export interface FilterState {
     minRating: number;
     openNow: boolean;
     reservable: boolean;
+    isDistanceLimitEnabled: boolean;
+    sortBy: SortOption;
 }
 
 interface FilterBarProps {
@@ -18,6 +21,30 @@ interface FilterBarProps {
 
 const FilterBar: React.FC<FilterBarProps> = ({ filters, onChange, maxDistance }) => {
     const [isExpanded, setIsExpanded] = React.useState(false);
+    const [isSortOpen, setIsSortOpen] = React.useState(false);
+    const sortRef = useRef<HTMLDivElement>(null);
+
+    // Handle clicks outside to close dropdown
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (sortRef.current && !sortRef.current.contains(event.target as Node)) {
+                setIsSortOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const sortOptions: { value: SortOption; label: string }[] = [
+        { value: 'best_match', label: 'Best Match' },
+        { value: 'highest_rated', label: 'Highest Rated' },
+        { value: 'most_popular', label: 'Most Popular' },
+        { value: 'price_low', label: 'Price: Low → High' },
+        { value: 'price_high', label: 'Price: High → Low' },
+        { value: 'closest', label: 'Closest' }
+    ];
+
+    const currentSortLabel = sortOptions.find(opt => opt.value === filters.sortBy)?.label || 'Sort By';
 
     const updateFilter = (updates: Partial<FilterState>) => {
         onChange({ ...filters, ...updates });
@@ -60,22 +87,69 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onChange, maxDistance })
                 ))}
             </div>
 
-            {/* Advanced Filters Toggle */}
-            <button
-                type="button"
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="text-[11px] font-bold text-indigo-500 uppercase tracking-widest flex items-center gap-1 hover:text-indigo-600 transition-colors"
-            >
-                <span>{isExpanded ? '− Hide filters' : '+ Advanced filters'}</span>
-            </button>
+            {/* Advanced Filters Toggle & Sort Dropdown */}
+            <div className="flex items-center justify-between">
+                <button
+                    type="button"
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="text-[11px] font-bold text-indigo-500 uppercase tracking-widest flex items-center gap-1 hover:text-indigo-600 transition-colors"
+                >
+                    <span>{isExpanded ? '− Hide filters' : '+ Advanced filters'}</span>
+                </button>
+
+                <div className="relative" ref={sortRef}>
+                    <button
+                        type="button"
+                        onClick={() => setIsSortOpen(!isSortOpen)}
+                        className="text-[11px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1 hover:text-gray-700 transition-colors bg-white px-2 py-1 rounded"
+                    >
+                        <span>Sort By: {currentSortLabel}</span>
+                        <svg className={`w-3 h-3 transition-transform ${isSortOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    {isSortOpen && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                            <div className="py-1">
+                                {sortOptions.map((option) => (
+                                    <button
+                                        key={option.value}
+                                        type="button"
+                                        onClick={() => {
+                                            updateFilter({ sortBy: option.value });
+                                            setIsSortOpen(false);
+                                        }}
+                                        className={`w-full text-left px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-colors ${filters.sortBy === option.value
+                                            ? 'bg-indigo-50 text-indigo-600'
+                                            : 'text-gray-600 hover:bg-gray-50'
+                                            }`}
+                                    >
+                                        {option.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
 
             {isExpanded && (
                 <div className="space-y-6 pt-2 animate-in fade-in slide-in-from-top-2 duration-200">
                     {/* Distance Slider (Miles) */}
                     <div>
                         <div className="flex justify-between items-center mb-2">
-                            <label className="text-sm font-bold text-gray-400 uppercase tracking-widest">Max Distance</label>
-                            <span className="text-sm font-bold text-indigo-600">
+                            <div className="flex items-center gap-2">
+                                <label className="text-sm font-bold text-gray-400 uppercase tracking-widest">Max Distance</label>
+                                <button
+                                    type="button"
+                                    onClick={() => updateFilter({ isDistanceLimitEnabled: !filters.isDistanceLimitEnabled })}
+                                    className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${filters.isDistanceLimitEnabled ? 'bg-indigo-600' : 'bg-gray-200'}`}
+                                >
+                                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${filters.isDistanceLimitEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                                </button>
+                            </div>
+                            <span className={`text-sm font-bold ${filters.isDistanceLimitEnabled ? 'text-indigo-600' : 'text-gray-300'}`}>
                                 {currentMiles} miles
                             </span>
                         </div>
@@ -85,8 +159,9 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onChange, maxDistance })
                             max={maxMiles}
                             step="0.1"
                             value={currentMiles}
+                            disabled={!filters.isDistanceLimitEnabled}
                             onChange={(e) => updateFilter({ distance: Math.round(parseFloat(e.target.value) * 1609.34) })}
-                            className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                            className={`w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-indigo-600 ${filters.isDistanceLimitEnabled ? 'bg-gray-200' : 'bg-gray-100 opacity-50 cursor-not-allowed'}`}
                         />
                     </div>
 

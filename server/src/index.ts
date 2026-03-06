@@ -45,6 +45,21 @@ function isGenericQuery(q: string): boolean {
   return GENERIC_QUERIES.includes(normalized) || ['things to do', 'fun things to do'].some((g) => normalized === g);
 }
 
+function mapPriceLevel(level: any): number | undefined {
+  if (typeof level === 'number') return level;
+  if (typeof level !== 'string') return undefined;
+
+  const map: Record<string, number> = {
+    'PRICE_LEVEL_FREE': 0,
+    'PRICE_LEVEL_INEXPENSIVE': 1,
+    'PRICE_LEVEL_MODERATE': 2,
+    'PRICE_LEVEL_EXPENSIVE': 3,
+    'PRICE_LEVEL_VERY_EXPENSIVE': 4
+  };
+
+  return map[level];
+}
+
 
 // searchText only supports `locationRestriction.rectangle`, not .circle.
 // We compute a bounding box from the circle, then post-filter with Haversine distance.
@@ -90,6 +105,58 @@ function isRelevant(p: any, q: string): boolean {
   }
 
   return false;
+}
+
+function inferPriceLevel(name: string, description: string = '', types: string[] = []): number | undefined {
+  const n = name.toLowerCase();
+  const d = description.toLowerCase();
+  const t = types.map((x) => x.toLowerCase());
+  const combined = `${n} ${d}`;
+
+  // 1. Keyword Overrides (Luxury / High-end) - General
+  const luxuryKeywords = [
+    'four seasons', 'ritz', 'st. regis', 'waldorf', 'aman', 'luxury', 'premium', 'royal',
+    'grand', 'exclusive', 'boutique', 'private', 'estate', 'fine dining', 'steakhouse',
+    'yacht', 'country club', 'resort & spa', 'marina', 'chic', 'high-end', 'upscale',
+    'elegant', 'sophisticated'
+  ];
+  if (luxuryKeywords.some(kw => combined.includes(kw))) return 4;
+
+  // 2. Keyword Overrides (Budget / Low-end) - General
+  const budgetKeywords = [
+    'hostel', 'motel', 'super 8', 'travelodge', 'days inn', 'backpackers', 'budget',
+    'cheap', 'discount', 'dollar', 'outlet', 'wholesale', 'thrift', 'flea market',
+    'fast food', 'drive-thru', 'takeaway', 'expresso', 'diner', 'economy', 'affordable',
+    'low-cost'
+  ];
+  if (budgetKeywords.some(kw => combined.includes(kw))) return 1;
+
+  // 3. Type Fallbacks
+  // 4: Very Expensive
+  if (t.some(x => ['resort', 'casino', 'spa', 'night_club', 'stadium'].includes(x))) return 4;
+
+  // 3: Expensive
+  if (t.some(x => ['amusement_park', 'convention_center', 'department_store', 'jewelry_store'].includes(x))) return 3;
+
+  // 2: Moderate
+  if (t.some(x => [
+    'hotel', 'lodging', 'restaurant', 'bar', 'aquarium', 'zoo', 'shopping_mall',
+    'movie_theater', 'fitness_center', 'clothing_store', 'electronics_store'
+  ].includes(x))) return 2;
+
+  // 1: Inexpensive
+  if (t.some(x => [
+    'cafe', 'bakery', 'museum', 'art_gallery', 'tourist_attraction', 'library',
+    'book_store', 'pharmacy', 'supermarket', 'convenience_store'
+  ].includes(x))) return 1;
+
+  // 0: Free / Very Low
+  if (t.some(x => [
+    'park', 'garden', 'beach', 'church', 'landmark', 'natural_feature',
+    'hiking_area', 'playground', 'community_center'
+  ].includes(x))) return 0;
+
+  return undefined;
 }
 
 function haversineDistanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -257,11 +324,13 @@ app.get('/api/places/nearby', async (req, res) => {
     const lngVal = location?.longitude ?? 0;
     const rating = p.rating as number | undefined;
     const userRatingCount = p.userRatingCount as number | undefined;
-    const priceLevel = p.priceLevel as number | undefined;
     const types = (p.types as string[]) ?? [];
     const address = (p.formattedAddress as string) ?? undefined;
     const photos = (p.photos as { name?: string }[]) ?? [];
     const photoRef = photos[0]?.name;
+
+    const editorialSummary = p.editorialSummary as { text?: string } | undefined;
+    const summaryText = editorialSummary?.text ?? '';
 
     const regularOpeningHours = p.regularOpeningHours as any;
     const reservable = p.reservable as boolean | undefined;
@@ -274,6 +343,12 @@ app.get('/api/places/nearby', async (req, res) => {
     const servesDinner = p.servesDinner as boolean | undefined;
     const outdoorSeating = p.outdoorSeating as boolean | undefined;
 
+    let priceLevel = mapPriceLevel(p.priceLevel);
+
+    // Fallback: Infer price if missing
+    if (priceLevel === undefined) {
+      priceLevel = inferPriceLevel(name, summaryText, types);
+    }
     return {
       id,
       name,

@@ -51,7 +51,8 @@ const App: React.FC = () => {
   const [isLocationSearchMinimized, setIsLocationSearchMinimized] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentLocation, setCurrentLocation] = useState<LatLng>({ lat: 37.7749, lng: -122.4194 });
-  const [searchQuery, setSearchQuery] = useState('');
+  const [locationQuery, setLocationQuery] = useState('');
+  const [activityQuery, setActivityQuery] = useState('');
   const [polygonCoordinates, setPolygonCoordinates] = useState<LatLng[]>([]);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [circle, setCircle] = useState<{ center: LatLng; radiusMeters: number } | null>(null);
@@ -76,7 +77,9 @@ const App: React.FC = () => {
     atmosphere: [],
     minRating: 0,
     openNow: false,
-    reservable: false
+    reservable: false,
+    isDistanceLimitEnabled: false,
+    sortBy: 'best_match'
   });
   const [sidebarWidth, setSidebarWidth] = useState(384); // Default sm:w-96
   const [isResizing, setIsResizing] = useState(false);
@@ -186,7 +189,7 @@ const App: React.FC = () => {
     async (query: string) => {
       if (!circle) return;
       setIsLoading(true);
-      setSearchQuery(query);
+      setActivityQuery(query);
       try {
         const results = await searchNearbyActivities({
           lat: circle.center.lat,
@@ -271,7 +274,7 @@ const App: React.FC = () => {
       setCircle(circleData);
       setIsAreaSelectionMode(false); // Ensure we stay in "interactive" mode but maybe hide placement tools
 
-      const query = searchQuery || 'things to do';
+      const query = activityQuery || 'things to do';
       setIsSidebarOpen(true);
       setIsLoading(true);
       setError(null);
@@ -303,7 +306,7 @@ const App: React.FC = () => {
         setIsAreaSelectionMode(false);
       }
     }
-  }, [startTickerLocation, isAreaSelectionMode, searchQuery]);
+  }, [startTickerLocation, isAreaSelectionMode, locationQuery]);
 
   const handleRevertRegion = useCallback(() => {
     setRegionHistory(prev => {
@@ -367,7 +370,8 @@ const App: React.FC = () => {
     setCircle(null);
     setActivities([]);
     setIsAreaSelectionMode(false);
-    setSearchQuery('');
+    setLocationQuery('');
+    setActivityQuery('');
     setRegionHistory([]);
     setIsRegionDirty(true);
     setIsRegionLocked(false);
@@ -415,8 +419,8 @@ const App: React.FC = () => {
 
   const filteredActivities = React.useMemo(() => {
     return activities.filter(activity => {
-      // 1. Distance filter
-      if (startTickerLocation) {
+      // 1. Distance filter (only if enabled)
+      if (filters.isDistanceLimitEnabled && startTickerLocation) {
         const dist = haversineDistance(
           startTickerLocation.lat,
           startTickerLocation.lng,
@@ -457,10 +461,67 @@ const App: React.FC = () => {
 
       return true;
     }).sort((a, b) => {
-      if (!startTickerLocation) return 0;
-      const distA = haversineDistance(startTickerLocation.lat, startTickerLocation.lng, a.lat, a.lng);
-      const distB = haversineDistance(startTickerLocation.lat, startTickerLocation.lng, b.lat, b.lng);
-      return distA - distB;
+      const getDist = (act: Activity) => {
+        if (!startTickerLocation) return 0;
+        return haversineDistance(startTickerLocation.lat, startTickerLocation.lng, act.lat, act.lng);
+      };
+
+      // Best Match Score used as a tie-breaker for all other sorts
+      const getTieBreakerScore = (act: Activity) => {
+        const r = (act.rating || 0) / 5;
+        const p = Math.min(1, Math.log10((act.userRatingCount || 0) + 1) / 4);
+        const d = startTickerLocation ? Math.max(0, 1 - getDist(act) / 10000) : 0.5;
+        const o = act.isOpen ? 1 : 0;
+        return (r * 0.35) + (p * 0.25) + (d * 0.25) + (o * 0.15);
+      };
+
+      let result = 0;
+
+      // Primary Sorting Logic
+      switch (filters.sortBy) {
+        case 'closest':
+          result = getDist(a) - getDist(b);
+          break;
+        case 'highest_rated':
+          result = (b.rating || 0) - (a.rating || 0);
+          break;
+        case 'most_popular': {
+          const score = (act: Activity) => (act.rating || 0) * Math.log10((act.userRatingCount || 0) + 1);
+          result = score(b) - score(a);
+          break;
+        }
+        case 'price_low': {
+          // Both missing: Tie
+          if (a.priceLevel === undefined && b.priceLevel === undefined) result = 0;
+          // One missing: Put it at the bottom
+          else if (a.priceLevel === undefined) result = 1;
+          else if (b.priceLevel === undefined) result = -1;
+          // Both have price: Sort ascending
+          else result = a.priceLevel - b.priceLevel;
+          break;
+        }
+        case 'price_high': {
+          // Both missing: Tie
+          if (a.priceLevel === undefined && b.priceLevel === undefined) result = 0;
+          // One missing: Put it at the bottom
+          else if (a.priceLevel === undefined) result = 1;
+          else if (b.priceLevel === undefined) result = -1;
+          // Both have price: Sort descending
+          else result = b.priceLevel - a.priceLevel;
+          break;
+        }
+        case 'best_match':
+        default:
+          result = getTieBreakerScore(b) - getTieBreakerScore(a);
+          break;
+      }
+
+      // If tied (or unpriced), use best_match score as secondary sort
+      if (result === 0) {
+        result = getTieBreakerScore(b) - getTieBreakerScore(a);
+      }
+
+      return result;
     });
   }, [activities, filters, startTickerLocation]);
 
@@ -516,7 +577,7 @@ const App: React.FC = () => {
                 activities={hasSearchArea ? filteredActivities : []}
                 isLoading={isLoading}
                 onSearch={handleSearch}
-                searchQuery={searchQuery}
+                searchQuery={activityQuery}
                 onViewDetails={setSelectedActivity}
                 favorites={favorites}
                 onToggleFavorite={toggleFavorite}
@@ -551,8 +612,8 @@ const App: React.FC = () => {
 
 
               <LocationSearch
-                inputValue={searchQuery}
-                onInputChange={setSearchQuery}
+                inputValue={locationQuery}
+                onInputChange={setLocationQuery}
                 onLocationSelect={handleLocationSelect}
                 onSetAsStartLocation={handleSetAsStartLocation}
                 isMinimized={isLocationSearchMinimized}

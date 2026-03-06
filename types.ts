@@ -69,6 +69,8 @@ export interface PlaceDetails {
 
 
 
+export type SortOption = 'best_match' | 'closest' | 'highest_rated' | 'most_popular' | 'price_low' | 'price_high';
+
 export interface MapRegion {
   lat: number;
   lng: number;
