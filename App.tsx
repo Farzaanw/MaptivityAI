@@ -78,6 +78,8 @@ const App: React.FC = () => {
     openNow: false,
     reservable: false
   });
+  const [sidebarWidth, setSidebarWidth] = useState(384); // Default sm:w-96
+  const [isResizing, setIsResizing] = useState(false);
 
   // Create a broadcast channel for cross-tab communication
   const authChannel = useRef<BroadcastChannel | null>(null);
@@ -528,6 +530,10 @@ const App: React.FC = () => {
                 filters={filters}
                 onFiltersChange={setFilters}
                 maxDistance={circle?.radiusMeters || 10000}
+                width={sidebarWidth}
+                setWidth={setSidebarWidth}
+                isResizing={isResizing}
+                setIsResizing={setIsResizing}
               />
 
 
@@ -538,6 +544,7 @@ const App: React.FC = () => {
                   onClose={() => setSelectedActivity(null)}
                   isFavorite={favorites.some(f => f.id === selectedActivity.id)}
                   onToggleFavorite={toggleFavorite}
+                  width={sidebarWidth}
                 />
               )}
 

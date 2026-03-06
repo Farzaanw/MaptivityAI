@@ -7,9 +7,10 @@ interface DetailsSidebarProps {
     onClose: () => void;
     isFavorite?: boolean;
     onToggleFavorite?: (activity: Activity) => void;
+    width: number;
 }
 
-const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFavorite, onToggleFavorite }) => {
+const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFavorite, onToggleFavorite, width }) => {
     const [details, setDetails] = useState<PlaceDetails | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -65,7 +66,10 @@ const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFa
     };
 
     return (
-        <div className="absolute inset-y-0 right-0 w-96 bg-white shadow-2xl z-[60] flex flex-col animate-in slide-in-from-right duration-300 border-l border-gray-100">
+        <div
+            className="absolute inset-y-0 right-0 bg-white shadow-2xl z-[60] flex flex-col animate-in slide-in-from-right duration-300 border-l border-gray-100"
+            style={{ width: `${width}px` }}
+        >
             {/* Header */}
             <div className="p-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-10">
                 <button

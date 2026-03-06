@@ -57,6 +57,41 @@ function circleToBoundingRect(lat: number, lng: number, radiusMeters: number) {
   };
 }
 
+function isRelevant(p: any, q: string): boolean {
+  const query = q.toLowerCase().trim();
+  if (!query || isGenericQuery(query)) return true;
+
+  const name = (p.displayName?.text || '').toLowerCase();
+  const address = (p.formattedAddress || '').toLowerCase();
+  const types = (p.types as string[]) ?? [];
+  const normalizedTypes = types.map((t) => t.toLowerCase().replace(/_/g, ' '));
+
+  // 1. Direct match in name, address or types
+  if (name.includes(query) || address.includes(query) || normalizedTypes.some((t) => t.includes(query))) {
+    return true;
+  }
+
+  // 2. Individual word matching for multi-word queries
+  const queryWords = query.split(/\s+/).filter((w) => w.length > 2);
+  const nameOrTypeMatch = queryWords.some(
+    (w) => name.includes(w) || normalizedTypes.some((t) => t.includes(w))
+  );
+
+  if (nameOrTypeMatch) {
+    // 3. Loose category protection: if it's a generic store/POI, insist on a name match
+    const looseCategories = ['book_store', 'store', 'establishment', 'point_of_interest', 'library', 'school'];
+    const isLoose = types.some((t) => looseCategories.includes(t));
+
+    if (isLoose) {
+      // If it's a loose category, require that at least one query word is actually in the name
+      return queryWords.some((w) => name.includes(w));
+    }
+    return true;
+  }
+
+  return false;
+}
+
 function haversineDistanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -143,8 +178,12 @@ app.get('/api/places/nearby', async (req, res) => {
       return haversineDistanceMeters(lat, lng, loc.latitude, loc.longitude) <= radius;
     });
 
-    // Filter out pure administrative areas (cities, states, countries)
+    // Filter out pure administrative areas and check for keyword relevance
     const filtered = withinCircle.filter((p) => {
+      // 1. Check relevance
+      if (!isRelevant(p, q)) return false;
+
+      // 2. Filter out administrative areas
       const types = (p.types as string[]) ?? [];
       const hasActivityType = types.some(
         (t) =>
@@ -161,54 +200,6 @@ app.get('/api/places/nearby', async (req, res) => {
 
     console.log(`[searchText] Got ${allPlaces.length} places, ${withinCircle.length} within circle, ${filtered.length} after admin filter`);
     data.places = filtered;
-
-    // If searchText returns no activity results, fall back to searchNearby
-    if (filtered.length === 0) {
-      console.log(`[searchText] No activity results for "${q}", falling back to searchNearby`);
-      const fallbackResponse = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          includedTypes: [
-            'amusement_park',
-            'aquarium',
-            'art_gallery',
-            'bakery',
-            'bar',
-            'beach',
-            'beauty_salon',
-            'bowling_alley',
-            'cafe',
-            'casino',
-            'church',
-            'garden',
-            'golf_course',
-            'gym',
-            'hotel',
-            'ice_cream_shop',
-            'lake',
-            'library',
-            'movie_theater',
-            'museum',
-            'park',
-            'restaurant',
-            'shopping_mall',
-            'spa',
-            'stadium',
-            'tourist_attraction',
-            'zoo',
-          ],
-          maxResultCount: 20,
-          locationRestriction: { circle },
-        }),
-      });
-      if (!fallbackResponse.ok) {
-        const err = await fallbackResponse.text();
-        console.error('[searchNearby fallback] Places API error:', fallbackResponse.status, err);
-        return res.status(fallbackResponse.status).json({ error: err || 'Places API error' });
-      }
-      data = (await fallbackResponse.json()) as { places?: Array<Record<string, unknown>> };
-    }
   } else {
     const response = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
       method: 'POST',
