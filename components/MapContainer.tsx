@@ -57,6 +57,7 @@ interface MapContainerProps {
   onRadiusChange?: (radiusMeters: number) => void;
   onRegionChange?: (center: LatLng, radiusMeters: number) => void;
   markedActivities?: any[]; // Using any[] to avoid circular dependency if Activity isn't imported
+  onRemoveActivity?: (id: string) => void;
 
   circle?: { center: LatLng; radiusMeters: number } | null;
   onRevert?: () => void;
@@ -87,7 +88,7 @@ function pathToCoordinates(path: google.maps.MVCArray<google.maps.LatLng>): LatL
 }
 
 const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
-  ({ onRegionSelect, center, polygonCoordinates, onPolygonChange, isDrawingMode, onDrawingModeChange, isAreaSelectionMode, onMapClickForPlacement, startTickerLocation, onRadiusChange, onRegionChange, markedActivities, circle, onRevert, canRevert, isLocked, onUnlock }, ref) => {
+  ({ onRegionSelect, center, polygonCoordinates, onPolygonChange, isDrawingMode, onDrawingModeChange, isAreaSelectionMode, onMapClickForPlacement, startTickerLocation, onRadiusChange, onRegionChange, markedActivities, onRemoveActivity, circle, onRevert, canRevert, isLocked, onUnlock }, ref) => {
 
 
 
@@ -113,6 +114,7 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
     const activityMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
     const temporaryMarkerRef = useRef<google.maps.OverlayView | null>(null);
     const temporaryMarkerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const pulseFrameRef = useRef<number | null>(null);
 
     const [mapType, setMapType] = React.useState<'roadmap' | 'satellite'>('roadmap');
 
@@ -607,6 +609,43 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
 
     }, [startTickerLocation, isLocked]);
 
+    // Pulsing animation for the search circle when in adjust mode
+    useEffect(() => {
+      if (!isLocked && searchCircleRef.current) {
+        let startTime = performance.now();
+        const animate = (time: number) => {
+          if (!searchCircleRef.current) return;
+
+          const elapsed = time - startTime;
+          // Oscillate between 0.2 and 0.7 opacity over 2 seconds
+          const opacity = 0.45 + 0.25 * Math.sin(elapsed / 300);
+          // Also slightly oscillate stroke weight for a more "breathing" feel
+          const weight = 8 + 4 * Math.sin(elapsed / 300);
+
+          searchCircleRef.current.setOptions({
+            strokeOpacity: opacity,
+            strokeWeight: weight
+          });
+
+          pulseFrameRef.current = requestAnimationFrame(animate);
+        };
+        pulseFrameRef.current = requestAnimationFrame(animate);
+      } else if (isLocked && searchCircleRef.current) {
+        // Reset to default solid state when locked
+        searchCircleRef.current.setOptions({
+          strokeOpacity: 0.5,
+          strokeWeight: 10
+        });
+      }
+
+      return () => {
+        if (pulseFrameRef.current) {
+          cancelAnimationFrame(pulseFrameRef.current);
+          pulseFrameRef.current = null;
+        }
+      };
+    }, [isLocked, startTickerLocation]);
+
 
 
     // Connection line cleanup happens in circle effect
@@ -643,6 +682,7 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
           class ActivityMarkerOverlay extends google.maps.OverlayView {
             private div: HTMLElement | null = null;
             private tooltip: HTMLElement | null = null;
+            private pinned: boolean = false;
 
             constructor(private activity: any, private map: google.maps.Map) {
               super();
@@ -666,6 +706,28 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
               pin.style.transformOrigin = 'bottom center';
               pin.style.animation = 'marker-bob 2s ease-in-out infinite';
 
+              // Inject animation keyframes once
+              if (!document.getElementById('marker-animation-style')) {
+                const style = document.createElement('style');
+                style.id = 'marker-animation-style';
+                style.textContent = `
+                  @keyframes marker-bob {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-8px); }
+                  }
+                `;
+                document.head.appendChild(style);
+              }
+
+              // Build tooltip content
+              const ratingStars = this.activity.rating
+                ? `<div style="display: flex; gap: 2px;">${Array.from({ length: 5 }, (_, i) =>
+                  `<svg style="width: 12px; height: 12px; color: ${i < Math.round(this.activity.rating) ? '#FBBF24' : '#E5E7EB'}" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>`
+                ).join('')}</div>`
+                : '';
+              const statusColor = this.activity.isOpen ? '#10B981' : '#EF4444';
+              const statusText = this.activity.isOpen !== undefined ? (this.activity.isOpen ? 'Open Now' : 'Closed') : '';
+
               // Tooltip element (hidden by default)
               this.tooltip = document.createElement('div');
               this.tooltip.className = 'activity-tooltip';
@@ -682,16 +744,7 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
               this.tooltip.style.padding = '8px';
               this.tooltip.style.transition = 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
               this.tooltip.style.zIndex = '100';
-              this.tooltip.style.pointerEvents = 'none';
-
-              const ratingStars = this.activity.rating
-                ? `<div style="display: flex; gap: 2px;">${Array.from({ length: 5 }, (_, i) =>
-                  `<svg style="width: 12px; height: 12px; color: ${i < Math.round(this.activity.rating) ? '#FBBF24' : '#E5E7EB'}" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>`
-                ).join('')}</div>`
-                : '';
-
-              const statusColor = this.activity.isOpen ? '#10B981' : '#EF4444';
-              const statusText = this.activity.isOpen !== undefined ? (this.activity.isOpen ? 'Open Now' : 'Closed') : '';
+              this.tooltip.style.pointerEvents = 'none'; // only enabled when pinned
 
               this.tooltip.innerHTML = `
                 ${this.activity.photoUrl ? `<img src="${this.activity.photoUrl}" style="width: 100%; height: 80px; object-fit: cover; border-radius: 8px; margin-bottom: 8px;" />` : ''}
@@ -700,37 +753,94 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
                   ${ratingStars}
                   <span style="font-size: 10px; font-weight: 600; color: ${statusColor};">${statusText}</span>
                 </div>
-                <div style="font-size: 10px; color: #6B7280; text-transform: capitalize;">${this.activity.category || 'Location'}</div>
+                <div style="font-size: 10px; color: #6B7280; text-transform: capitalize; margin-bottom: 8px;">${this.activity.category || 'Location'}</div>
+                <button
+                  id="remove-marker-btn-${this.activity.id}"
+                  style="
+                    display: block; width: 100%; padding: 6px 0;
+                    background: #FEE2E2; color: #DC2626;
+                    border: none; border-radius: 8px;
+                    font-size: 12px; font-weight: 600;
+                    cursor: pointer; text-align: center;
+                    transition: background 0.15s;
+                  "
+                >Remove marker</button>
               `;
-
-              // Animations Styles
-              if (!document.getElementById('marker-animation-style')) {
-                const style = document.createElement('style');
-                style.id = 'marker-animation-style';
-                style.textContent = `
-                  @keyframes marker-bob {
-                    0%, 100% { transform: translateY(0); }
-                    50% { transform: translateY(-8px); }
-                  }
-                `;
-                document.head.appendChild(style);
-              }
 
               this.div.appendChild(this.tooltip);
               this.div.appendChild(pin);
 
-              this.div.onmouseover = () => {
+              // Helpers
+              const showTooltip = () => {
                 this.tooltip!.style.opacity = '1';
                 this.tooltip!.style.visibility = 'visible';
                 this.tooltip!.style.transform = 'translateX(-50%) scale(1)';
                 this.div!.style.zIndex = '1000';
               };
-              this.div.onmouseout = () => {
+              const hideTooltip = () => {
                 this.tooltip!.style.opacity = '0';
                 this.tooltip!.style.visibility = 'hidden';
                 this.tooltip!.style.transform = 'translateX(-50%) scale(0.95)';
                 this.div!.style.zIndex = '10';
               };
+              const pinTooltip = () => {
+                this.pinned = true;
+                showTooltip();
+                this.tooltip!.style.pointerEvents = 'auto';
+              };
+              const unpinTooltip = () => {
+                this.pinned = false;
+                hideTooltip();
+                this.tooltip!.style.pointerEvents = 'none';
+              };
+
+              // Desktop hover (only show if not already pinned)
+              const isTouchDevice = 'ontouchstart' in window;
+              if (!isTouchDevice) {
+                this.div.addEventListener('mouseover', () => {
+                  if (!this.pinned) showTooltip();
+                });
+                this.div.addEventListener('mouseout', (e: MouseEvent) => {
+                  if (!this.pinned) {
+                    // Don't hide if cursor moved to tooltip
+                    const related = e.relatedTarget as Node | null;
+                    if (this.tooltip && this.tooltip.contains(related)) return;
+                    hideTooltip();
+                  }
+                });
+              }
+
+              // Click / tap: toggle pin
+              this.div.addEventListener('click', (e: MouseEvent) => {
+                e.stopPropagation();
+                if (this.pinned) {
+                  unpinTooltip();
+                } else {
+                  pinTooltip();
+                }
+              });
+
+              // Touch: tap always pins (no hover on mobile)
+              if (isTouchDevice) {
+                this.div.addEventListener('touchend', (e: TouchEvent) => {
+                  e.stopPropagation();
+                  if (!this.pinned) pinTooltip();
+                });
+              }
+
+              // Remove button click
+              this.tooltip.addEventListener('click', (e: MouseEvent) => {
+                const btn = (e.target as HTMLElement).closest(`#remove-marker-btn-${this.activity.id}`);
+                if (btn) {
+                  e.stopPropagation();
+                  onRemoveActivity?.(this.activity.id);
+                }
+              });
+
+              // Dismiss pinned tooltip when clicking anywhere on the map
+              mapRef.current?.addListener('click', () => {
+                if (this.pinned) unpinTooltip();
+              });
 
               const panes = this.getPanes()!;
               panes.overlayMouseTarget.appendChild(this.div);

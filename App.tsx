@@ -4,6 +4,8 @@ import type { AppPage } from './components/Header';
 import MapContainer from './components/MapContainer';
 import Sidebar from './components/Sidebar';
 import LocationSearch from './components/LocationSearch';
+import { FilterState } from './components/FilterBar';
+import FilterBar from './components/FilterBar';
 // import AuthOverlay from './components/AuthOverlay';
 // import ResetPasswordOverlay from './components/ResetPasswordOverlay';
 // import PlannerPage from './components/PlannerPage';
@@ -21,6 +23,17 @@ import { searchNearbyActivities } from './services/placesService';
 import { getSession, onAuthStateChange } from './services/authService';
 
 type LatLng = { lat: number; lng: number };
+
+const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371000; // Earth's radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
 
 interface MapContainerHandle {
   addMarkerAtLocation: (lat: number, lng: number, title: string, bounds: [[number, number], [number, number]]) => void;
@@ -56,6 +69,15 @@ const App: React.FC = () => {
   const [regionHistory, setRegionHistory] = useState<{ center: LatLng; radiusMeters: number }[]>([]);
   const [isRegionDirty, setIsRegionDirty] = useState(true);
   const [isRegionLocked, setIsRegionLocked] = useState(false);
+  const [filters, setFilters] = useState<FilterState>({
+    distance: 5000,
+    priceLevels: [],
+    experience: 'all',
+    atmosphere: [],
+    minRating: 0,
+    openNow: false,
+    reservable: false
+  });
 
   // Create a broadcast channel for cross-tab communication
   const authChannel = useRef<BroadcastChannel | null>(null);
@@ -140,6 +162,10 @@ const App: React.FC = () => {
       setRegionHistory([]);
       setIsRegionDirty(true);
       setIsRegionLocked(false);
+
+      if (lat && lng) {
+        setFilters(f => ({ ...f, distance: searchRadius }));
+      }
 
 
 
@@ -385,6 +411,57 @@ const App: React.FC = () => {
     );
   }
 
+  const filteredActivities = React.useMemo(() => {
+    return activities.filter(activity => {
+      // 1. Distance filter
+      if (startTickerLocation) {
+        const dist = haversineDistance(
+          startTickerLocation.lat,
+          startTickerLocation.lng,
+          activity.lat,
+          activity.lng
+        );
+        if (dist > filters.distance) return false;
+      }
+
+      // 2. Rating filter
+      if (activity.rating && activity.rating < filters.minRating) return false;
+
+      // 3. Price filter
+      if (filters.priceLevels.length > 0 && activity.priceLevel !== undefined) {
+        if (!filters.priceLevels.includes(activity.priceLevel)) return false;
+      }
+
+      // 4. Experience/Category filter
+      if (filters.experience !== 'all' && activity.category !== filters.experience) return false;
+
+      // 5. Atmosphere filter (heuristic based on types and flags)
+      if (filters.atmosphere.length > 0) {
+        const matches = filters.atmosphere.every(vibe => {
+          if (vibe === 'Family Friendly') return !!activity.goodForChildren;
+          if (vibe === 'Good for Groups') return !!activity.goodForGroups;
+          if (vibe === 'Lively' && activity.types?.some(t => ['night_club', 'bar', 'casino', 'stadium'].includes(t))) return true;
+          if (vibe === 'Cozy' && activity.types?.some(t => ['cafe', 'bakery', 'book_store'].includes(t))) return true;
+          if (vibe === 'Tourist Friendly' && activity.types?.some(t => ['tourist_attraction', 'museum', 'landmark'].includes(t))) return true;
+          if (vibe === 'Local Gem' && (activity.userRatingCount || 0) < 500 && (activity.rating || 0) >= 4.5) return true;
+          return false;
+        });
+        if (!matches) return false;
+      }
+
+      // 6. Quick Toggles
+      if (filters.openNow && !activity.regularOpeningHours?.openNow) return false;
+      if (filters.reservable && !activity.reservable) return false;
+
+      return true;
+    }).sort((a, b) => {
+      if (!startTickerLocation) return 0;
+      const distA = haversineDistance(startTickerLocation.lat, startTickerLocation.lng, a.lat, a.lng);
+      const distB = haversineDistance(startTickerLocation.lat, startTickerLocation.lng, b.lat, b.lng);
+      return distA - distB;
+    });
+  }, [activities, filters, startTickerLocation]);
+
   return (
     <div className="relative h-screen w-full flex flex-col overflow-hidden font-sans">
       <Header activePage={activePage} onNavigate={setActivePage} />
@@ -419,6 +496,7 @@ const App: React.FC = () => {
                 onRadiusChange={handleRadiusChange}
                 onRegionChange={handleRegionChange}
                 markedActivities={markedActivities}
+                onRemoveActivity={(id) => setMarkedActivities(prev => prev.filter(a => a.id !== id))}
                 circle={circle}
                 onRevert={handleRevertRegion}
                 canRevert={regionHistory.length > 0}
@@ -433,7 +511,7 @@ const App: React.FC = () => {
               <Sidebar
                 isOpen={isSidebarOpen}
                 toggle={toggleSidebar}
-                activities={hasSearchArea ? activities : []}
+                activities={hasSearchArea ? filteredActivities : []}
                 isLoading={isLoading}
                 onSearch={handleSearch}
                 searchQuery={searchQuery}
@@ -441,8 +519,15 @@ const App: React.FC = () => {
                 favorites={favorites}
                 onToggleFavorite={toggleFavorite}
                 markedActivityIds={markedActivities.map(a => a.id)}
-                onToggleMark={toggleMarkedActivity}
+                onToggleMark={(activity) => setMarkedActivities(prev =>
+                  prev.some(a => a.id === activity.id)
+                    ? prev.filter(a => a.id !== activity.id)
+                    : [...prev, activity]
+                )}
                 error={error}
+                filters={filters}
+                onFiltersChange={setFilters}
+                maxDistance={circle?.radiusMeters || 10000}
               />
 
 

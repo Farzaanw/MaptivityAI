@@ -11,6 +11,19 @@ interface PlaceResponse {
   types?: string[];
   address?: string;
   photoUrl?: string;
+  regularOpeningHours?: {
+    openNow?: boolean;
+    weekdayDescriptions?: string[];
+  };
+  reservable?: boolean;
+  goodForChildren?: boolean;
+  goodForGroups?: boolean;
+  servesVegetarianFood?: boolean;
+  servesBreakfast?: boolean;
+  servesBrunch?: boolean;
+  servesLunch?: boolean;
+  servesDinner?: boolean;
+  outdoorSeating?: boolean;
 }
 
 interface NearbyResponse {
@@ -19,10 +32,12 @@ interface NearbyResponse {
 
 function inferCategory(types: string[] = []): Activity['category'] {
   const t = types.map((x) => x.toLowerCase());
-  if (t.some((x) => ['restaurant', 'food', 'cafe', 'meal'].some((k) => x.includes(k)))) return 'restaurant';
-  if (t.some((x) => ['park', 'natural_feature'].some((k) => x.includes(k)))) return 'park';
-  if (t.some((x) => ['entertainment', 'movie_theater', 'night_club'].some((k) => x.includes(k)))) return 'entertainment';
-  return 'attraction';
+  // Food bucket
+  if (t.some((x) => ['restaurant', 'food', 'cafe', 'meal', 'bakery', 'bar', 'ice_cream_shop'].some((k) => x.includes(k)))) return 'food';
+  // Places (Nature/Parks/Landmarks) bucket
+  if (t.some((x) => ['park', 'natural_feature', 'beach', 'garden', 'lake', 'landmark', 'tourist_attraction'].some((k) => x.includes(k)))) return 'places';
+  // Activities (Entertainment/Shopping/Culture) bucket
+  return 'activities';
 }
 
 export async function searchNearbyActivities(params: {
@@ -70,6 +85,16 @@ export async function searchNearbyActivities(params: {
       priceLevel: p.priceLevel,
       photoUrl: p.photoUrl ? `${baseUrl}/api/places/photo/${p.photoUrl}` : undefined,
       types: p.types,
+      regularOpeningHours: p.regularOpeningHours,
+      reservable: p.reservable,
+      goodForChildren: p.goodForChildren,
+      goodForGroups: p.goodForGroups,
+      servesVegetarianFood: p.servesVegetarianFood,
+      servesBreakfast: p.servesBreakfast,
+      servesBrunch: p.servesBrunch,
+      servesLunch: p.servesLunch,
+      servesDinner: p.servesDinner,
+      outdoorSeating: p.outdoorSeating,
     }));
   } catch (error) {
     console.error('[placesService] Error fetching places:', error);

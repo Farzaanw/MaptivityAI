@@ -32,9 +32,9 @@ if (
 
 const app = express();
 const FIELDS =
-  'places.id,places.displayName,places.location,places.formattedAddress,places.types,places.photos';
+  'places.id,places.displayName,places.location,places.formattedAddress,places.types,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.regularOpeningHours,places.reservable,places.goodForChildren,places.goodForGroups,places.servesVegetarianFood,places.servesBreakfast,places.servesBrunch,places.servesLunch,places.servesDinner,places.outdoorSeating';
 const PLACE_DETAILS_FIELDS =
-  'id,displayName,formattedAddress,location,types,photos,rating,userRatingCount,priceLevel,websiteUri,internationalPhoneNumber,regularOpeningHours,editorialSummary,reviews,googleMapsUri';
+  'id,displayName,formattedAddress,location,types,photos,rating,userRatingCount,priceLevel,websiteUri,internationalPhoneNumber,regularOpeningHours,editorialSummary,reviews,googleMapsUri,reservable,goodForChildren,goodForGroups,servesVegetarianFood,servesBreakfast,servesBrunch,servesLunch,servesDinner,outdoorSeating';
 
 
 
@@ -43,6 +43,28 @@ const GENERIC_QUERIES = ['things to do', 'fun things to do', ''];
 function isGenericQuery(q: string): boolean {
   const normalized = q.trim().toLowerCase();
   return GENERIC_QUERIES.includes(normalized) || ['things to do', 'fun things to do'].some((g) => normalized === g);
+}
+
+
+// searchText only supports `locationRestriction.rectangle`, not .circle.
+// We compute a bounding box from the circle, then post-filter with Haversine distance.
+function circleToBoundingRect(lat: number, lng: number, radiusMeters: number) {
+  const deltaLat = radiusMeters / 111320;
+  const deltaLng = radiusMeters / (111320 * Math.cos((lat * Math.PI) / 180));
+  return {
+    low: { latitude: lat - deltaLat, longitude: lng - deltaLng },
+    high: { latitude: lat + deltaLat, longitude: lng + deltaLng },
+  };
+}
+
+function haversineDistanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 app.use(
@@ -96,12 +118,14 @@ app.get('/api/places/nearby', async (req, res) => {
   let data: { places?: Array<Record<string, unknown>> };
 
   if (q && !isGenericQuery(q)) {
+    const boundingRect = circleToBoundingRect(lat, lng, radius);
     const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
       method: 'POST',
       headers,
       body: JSON.stringify({
         textQuery: q,
-        locationBias: { circle },
+        // searchText only supports rectangle for locationRestriction (not circle)
+        locationRestriction: { rectangle: boundingRect },
       }),
     });
     if (!response.ok) {
@@ -111,11 +135,17 @@ app.get('/api/places/nearby', async (req, res) => {
     }
     data = (await response.json()) as { places?: Array<Record<string, unknown>> };
 
-    // Filter out administrative areas (cities, states, countries) - they clutter results
-    const places = (data.places ?? []) as Array<Record<string, unknown>>;
-    const filtered = places.filter((p) => {
+    // Post-filter: keep only places within the actual circle radius (bounding box is slightly larger)
+    const allPlaces = (data.places ?? []) as Array<Record<string, unknown>>;
+    const withinCircle = allPlaces.filter((p) => {
+      const loc = p.location as { latitude?: number; longitude?: number } | undefined;
+      if (!loc?.latitude || !loc?.longitude) return true; // keep if no location info
+      return haversineDistanceMeters(lat, lng, loc.latitude, loc.longitude) <= radius;
+    });
+
+    // Filter out pure administrative areas (cities, states, countries)
+    const filtered = withinCircle.filter((p) => {
       const types = (p.types as string[]) ?? [];
-      // Exclude if it's only administrative/political/locality types with no real activity types
       const hasActivityType = types.some(
         (t) =>
           ![
@@ -129,7 +159,7 @@ app.get('/api/places/nearby', async (req, res) => {
       return hasActivityType || types.length === 0;
     });
 
-    console.log(`[searchText] Got ${places.length} places, filtered to ${filtered.length} after removing admin areas`);
+    console.log(`[searchText] Got ${allPlaces.length} places, ${withinCircle.length} within circle, ${filtered.length} after admin filter`);
     data.places = filtered;
 
     // If searchText returns no activity results, fall back to searchNearby
@@ -242,6 +272,17 @@ app.get('/api/places/nearby', async (req, res) => {
     const photos = (p.photos as { name?: string }[]) ?? [];
     const photoRef = photos[0]?.name;
 
+    const regularOpeningHours = p.regularOpeningHours as any;
+    const reservable = p.reservable as boolean | undefined;
+    const goodForChildren = p.goodForChildren as boolean | undefined;
+    const goodForGroups = p.goodForGroups as boolean | undefined;
+    const servesVegetarianFood = p.servesVegetarianFood as boolean | undefined;
+    const servesBreakfast = p.servesBreakfast as boolean | undefined;
+    const servesBrunch = p.servesBrunch as boolean | undefined;
+    const servesLunch = p.servesLunch as boolean | undefined;
+    const servesDinner = p.servesDinner as boolean | undefined;
+    const outdoorSeating = p.outdoorSeating as boolean | undefined;
+
     return {
       id,
       name,
@@ -253,6 +294,16 @@ app.get('/api/places/nearby', async (req, res) => {
       ...(types.length > 0 && { types }),
       ...(address && { address }),
       ...(photoRef && { photoUrl: photoRef }),
+      ...(regularOpeningHours && { regularOpeningHours }),
+      ...(reservable != null && { reservable }),
+      ...(goodForChildren != null && { goodForChildren }),
+      ...(goodForGroups != null && { goodForGroups }),
+      ...(servesVegetarianFood != null && { servesVegetarianFood }),
+      ...(servesBreakfast != null && { servesBreakfast }),
+      ...(servesBrunch != null && { servesBrunch }),
+      ...(servesLunch != null && { servesLunch }),
+      ...(servesDinner != null && { servesDinner }),
+      ...(outdoorSeating != null && { outdoorSeating }),
     };
   });
 

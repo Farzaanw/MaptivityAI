@@ -13,7 +13,7 @@ export interface Activity {
   uri: string;
   lat: number;
   lng: number;
-  category: 'restaurant' | 'attraction' | 'park' | 'entertainment';
+  category: 'food' | 'activities' | 'places';
 
   rating?: number;
   userRatingCount?: number;
@@ -21,6 +21,19 @@ export interface Activity {
   photoUrl?: string;
   types?: string[];
   isOpen?: boolean;
+  regularOpeningHours?: {
+    openNow?: boolean;
+    weekdayDescriptions?: string[];
+  };
+  reservable?: boolean;
+  goodForChildren?: boolean;
+  goodForGroups?: boolean;
+  servesVegetarianFood?: boolean;
+  servesBreakfast?: boolean;
+  servesBrunch?: boolean;
+  servesLunch?: boolean;
+  servesDinner?: boolean;
+  outdoorSeating?: boolean;
 }
 
 export interface PlaceDetails {

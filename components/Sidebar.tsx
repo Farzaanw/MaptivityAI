@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Activity } from '../types';
 import ActivityCard from './ActivityCard';
+import FilterBar, { FilterState } from './FilterBar';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -16,6 +17,9 @@ interface SidebarProps {
   markedActivityIds: string[];
   onToggleMark: (activity: Activity) => void;
   error?: string | null;
+  filters: FilterState;
+  onFiltersChange: (filters: FilterState) => void;
+  maxDistance: number;
 }
 
 
@@ -31,7 +35,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   onToggleFavorite,
   markedActivityIds,
   onToggleMark,
-  error
+  error,
+  filters,
+  onFiltersChange,
+  maxDistance
 }) => {
 
 
@@ -64,7 +71,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {isOpen && (
         <div className="flex-1 flex flex-col h-full overflow-hidden p-6">
-          <form onSubmit={handleSubmit} className="mb-8">
+          <form onSubmit={handleSubmit} className="mb-2">
             <label className="block text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">What are you looking for?</label>
             <div className="relative">
               <input
@@ -78,6 +85,11 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
               </svg>
             </div>
+            <FilterBar
+              filters={filters}
+              onChange={onFiltersChange}
+              maxDistance={maxDistance}
+            />
           </form>
 
           <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">

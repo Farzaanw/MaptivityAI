@@ -106,6 +106,16 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
                 <span className="text-[10px] text-gray-300 ml-0.5">({activity.userRatingCount})</span>
               </div>
             )}
+            {activity.priceLevel !== undefined && (
+              <span className="text-[10px] font-bold text-gray-400 ml-1">
+                {'• '}{'$'.repeat(activity.priceLevel || 1)}
+              </span>
+            )}
+            {activity.reservable && (
+              <span className="text-[10px] font-bold text-indigo-500 ml-1">
+                {'• '}Reservable
+              </span>
+            )}
           </div>
           <p className="text-xs text-gray-500 mt-1">
             {activity.description}
@@ -121,8 +131,8 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
         <button
           onClick={handleMarkClick}
           className={`text-xs font-bold transition-all flex items-center gap-1 group/btn px-3 py-1.5 rounded-lg ${isMarked
-              ? 'bg-red-50 text-red-600 hover:bg-red-100'
-              : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+            ? 'bg-red-50 text-red-600 hover:bg-red-100'
+            : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
             }`}
         >
           {isMarked ? 'Remove mark from map' : 'Mark on map'}
