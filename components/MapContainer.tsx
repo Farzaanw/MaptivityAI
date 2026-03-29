@@ -3,6 +3,7 @@
 - Drawing Library: polygon drawing with DrawingManager
 - Browser Geolocation API - find users current location (permission-based) */
 import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import type { Activity } from '../types';
 
 // CSS for pulsing circle animation
 const pulseStyle = document.createElement('style');
@@ -56,7 +57,8 @@ interface MapContainerProps {
   startTickerLocation: { lat: number; lng: number } | null;
   onRadiusChange?: (radiusMeters: number) => void;
   onRegionChange?: (center: LatLng, radiusMeters: number) => void;
-  markedActivities?: any[]; // Using any[] to avoid circular dependency if Activity isn't imported
+  markedActivities?: Activity[];
+  hoveredActivityId?: string | null;
   onRemoveActivity?: (id: string) => void;
 
   circle?: { center: LatLng; radiusMeters: number } | null;
@@ -77,6 +79,11 @@ interface MapContainerHandle {
   clearTemporaryMarker: () => void;
 }
 
+interface ActivityMarkerOverlayHandle extends google.maps.OverlayView {
+  getActivityId: () => string;
+  setHighlighted: (highlighted: boolean) => void;
+}
+
 function pathToCoordinates(path: google.maps.MVCArray<google.maps.LatLng>): LatLng[] {
   const coords: LatLng[] = [];
   for (let i = 0; i < path.getLength(); i++) {
@@ -87,7 +94,7 @@ function pathToCoordinates(path: google.maps.MVCArray<google.maps.LatLng>): LatL
 }
 
 const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
-  ({ onRegionSelect, center, polygonCoordinates, onPolygonChange, isDrawingMode, onDrawingModeChange, isAreaSelectionMode, onMapClickForPlacement, startTickerLocation, onRadiusChange, onRegionChange, markedActivities, onRemoveActivity, circle, onRevert, canRevert, isLocked, onUnlock }, ref) => {
+  ({ onRegionSelect, center, polygonCoordinates, onPolygonChange, isDrawingMode, onDrawingModeChange, isAreaSelectionMode, onMapClickForPlacement, startTickerLocation, onRadiusChange, onRegionChange, markedActivities, hoveredActivityId, onRemoveActivity, circle, onRevert, canRevert, isLocked, onUnlock }, ref) => {
 
     const mapRef = useRef<google.maps.Map | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -105,13 +112,12 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
     const circleArrowMarkersRef = useRef<google.maps.Marker[]>([]);
     const circleArrowListenerRef = useRef<google.maps.MapsEventListener | null>(null);
     const revertMarkerRef = useRef<google.maps.Marker | null>(null);
-    const activityMarkersRef = useRef<Map<string, google.maps.OverlayView>>(new Map());
+    const activityMarkersRef = useRef<Map<string, ActivityMarkerOverlayHandle>>(new Map());
     const temporaryMarkerRef = useRef<google.maps.OverlayView | null>(null);
     const temporaryMarkerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const pulseFrameRef = useRef<number | null>(null);
     const unpinFunctionsRef = useRef<Set<() => void>>(new Set());
     const topZIndexRef = useRef<number>(2000);
-
     const [mapType, setMapType] = React.useState<'roadmap' | 'satellite'>('roadmap');
 
     // Initialize map once
@@ -463,274 +469,363 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(
     // Marked Activities
     useEffect(() => {
       if (!mapRef.current) return;
-      const currentIds = new Set(markedActivities?.map(a => a.id) || []);
+      const currentIds = new Set(markedActivities?.map((activity) => activity.id) || []);
+      const startLatLng = startTickerLocation
+        ? new google.maps.LatLng(startTickerLocation.lat, startTickerLocation.lng)
+        : null;
+      const getDistanceText = (activity: Activity) => {
+        if (!startLatLng) return 'Distance unavailable';
+        const endLatLng = new google.maps.LatLng(activity.lat, activity.lng);
+        const meters = google.maps.geometry.spherical.computeDistanceBetween(startLatLng, endLatLng);
+        const miles = meters / 1609.34;
+        return `${miles.toFixed(1)} mi`;
+      };
 
-      activityMarkersRef.current.forEach((m, id) => {
+      const getOffsetMidpoint = (activity: Activity) => {
+        const endLatLng = new google.maps.LatLng(activity.lat, activity.lng);
+        const midpoint = google.maps.geometry.spherical.interpolate(startLatLng!, endLatLng, 0.5);
+        const heading = google.maps.geometry.spherical.computeHeading(startLatLng!, endLatLng);
+        const hash = activity.id.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+        const offsetDistanceMeters = 28 + (hash % 3) * 18;
+        const perpendicularHeading = heading + (hash % 2 === 0 ? 90 : -90);
+        return google.maps.geometry.spherical.computeOffset(midpoint, offsetDistanceMeters, perpendicularHeading);
+      };
+
+      activityMarkersRef.current.forEach((overlay, id) => {
         if (!currentIds.has(id)) {
-          m.setMap(null);
+          overlay.setMap(null);
           activityMarkersRef.current.delete(id);
         }
       });
 
-      markedActivities?.forEach(activity => {
-        if (!activityMarkersRef.current.has(activity.id)) {
-          class ActivityMarkerOverlay extends google.maps.OverlayView {
-            private div: HTMLElement | null = null;
-            private tooltip: HTMLElement | null = null;
-            private pinned: boolean = false;
-            // Path line and label
-            private labelOverlay: google.maps.OverlayView | null = null;
-            private pathLine: google.maps.Polyline | null = null;
-            private isTooltipBelow: boolean = false;
+      markedActivities?.forEach((activity) => {
+        if (activityMarkersRef.current.has(activity.id)) {
+          return;
+        }
 
-            constructor(private activity: any, private map: google.maps.Map) {
-              super();
-              this.setMap(map);
-            }
+        class DistanceLabelOverlay extends google.maps.OverlayView {
+          private div: HTMLElement | null = null;
 
-            public unpinTooltip = () => {
-              if (this.pinned) {
-                this.pinned = false;
-                this.hideTooltip();
-                if (this.tooltip) this.tooltip.style.pointerEvents = 'none';
-                this.hidePath();
-              }
-            }
+          constructor(private pos: google.maps.LatLng, private text: string) {
+            super();
+          }
 
-            private showTooltip() {
-              if (this.tooltip) {
-                this.tooltip.style.opacity = '1';
-                this.tooltip.style.visibility = 'visible';
-                this.tooltip.style.transform = 'translateX(-50%) scale(1)';
-              }
-            }
+          onAdd() {
+            this.div = document.createElement('div');
+            this.div.style.position = 'absolute';
+            this.div.style.background = 'rgba(15, 23, 42, 0.78)';
+            this.div.style.color = 'white';
+            this.div.style.padding = '6px 12px';
+            this.div.style.borderRadius = '999px';
+            this.div.style.fontSize = '12px';
+            this.div.style.fontWeight = '700';
+            this.div.style.letterSpacing = '0.01em';
+            this.div.style.boxShadow = '0 8px 20px rgba(14, 116, 144, 0.24)';
+            this.div.style.border = '1px solid rgba(125, 211, 252, 0.45)';
+            this.div.style.backdropFilter = 'blur(8px)';
+            this.div.style.pointerEvents = 'none';
+            this.div.style.transform = 'translate(-50%, -50%)';
+            this.div.style.transition = 'opacity 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease';
+            this.div.textContent = this.text;
+            this.getPanes()!.floatPane.appendChild(this.div);
+          }
 
-            private hideTooltip() {
-              if (this.tooltip) {
-                this.tooltip.style.opacity = '0';
-                this.tooltip.style.visibility = 'hidden';
-                this.tooltip.style.transform = 'translateX(-50%) scale(0.95)';
-              }
-            }
-
-            private pinTooltip() {
-              this.pinned = true;
-              this.showTooltip();
-              if (this.tooltip) this.tooltip.style.pointerEvents = 'auto';
-              topZIndexRef.current += 1;
-              if (this.div) this.div.style.zIndex = topZIndexRef.current.toString();
-              this.showPath();
-            }
-
-            private showPath() {
-              if (!mapRef.current || !startTickerLocation) return;
-              if (this.pathLine) return; // Already showing
-
-              const start = new google.maps.LatLng(startTickerLocation.lat, startTickerLocation.lng);
-              const end = new google.maps.LatLng(this.activity.lat, this.activity.lng);
-
-              // Create polyline (black dashed line)
-              this.pathLine = new google.maps.Polyline({
-                path: [start, end],
-                geodesic: true,
-                strokeColor: '#000000',
-                strokeOpacity: 0,
-                strokeWeight: 2,
-                icons: [{
-                  icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 4 },
-                  offset: '0',
-                  repeat: '24px'
-                }],
-                map: mapRef.current
-              });
-
-              this.pathLine.addListener('click', (e: google.maps.PolyMouseEvent) => {
-                if (e.domEvent) e.domEvent.stopPropagation();
-                if (this.pinned) this.unpinTooltip(); else this.pinTooltip();
-              });
-
-              this.pathLine.addListener('mouseover', () => {
-                if (this.pathLine) this.pathLine.setOptions({ strokeWeight: 4 });
-                if (this.labelOverlay && (this.labelOverlay as any).show) (this.labelOverlay as any).show();
-              });
-
-              this.pathLine.addListener('mouseout', () => {
-                if (this.pathLine) this.pathLine.setOptions({ strokeWeight: 2 });
-                if (!this.pinned && this.labelOverlay && (this.labelOverlay as any).hide) (this.labelOverlay as any).hide();
-              });
-
-              // Calculate distance logic
-              const meters = google.maps.geometry.spherical.computeDistanceBetween(start, end);
-              const miles = (meters / 1609.34).toFixed(1);
-
-              // Distance label overlay
-              const midpoint = google.maps.geometry.spherical.interpolate(start, end, 0.5);
-
-              class DistanceLabelOverlay extends google.maps.OverlayView {
-                private div: HTMLElement | null = null;
-                constructor(private pos: google.maps.LatLng, private text: string) { super(); }
-                onAdd() {
-                  this.div = document.createElement('div');
-                  this.div.style.position = 'absolute';
-                  this.div.style.backgroundColor = 'black';
-                  this.div.style.color = 'white';
-                  this.div.style.padding = '6px 12px';
-                  this.div.style.borderRadius = '8px';
-                  this.div.style.fontSize = '14px';
-                  this.div.style.fontWeight = '800';
-                  this.div.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
-                  this.div.style.pointerEvents = 'none';
-                  this.div.style.transform = 'translate(-50%, -50%)';
-                  this.div.style.transition = 'opacity 0.15s ease-in-out';
-                  this.div.style.opacity = '0';
-                  this.div.style.visibility = 'hidden';
-                  this.div.textContent = `${this.text} mi`;
-                  this.getPanes()!.floatPane.appendChild(this.div);
-                }
-                public show() { if (this.div) { this.div.style.opacity = '1'; this.div.style.visibility = 'visible'; } }
-                public hide() { if (this.div) { this.div.style.opacity = '0'; this.div.style.visibility = 'hidden'; } }
-                draw() {
-                  if (!this.div) return;
-                  const proj = this.getProjection();
-                  const pixel = proj.fromLatLngToDivPixel(this.pos);
-                  if (pixel) {
-                    this.div.style.left = pixel.x + 'px';
-                    this.div.style.top = pixel.y + 'px';
-                  }
-                }
-                onRemove() {
-                  if (this.div) {
-                    this.div.parentNode?.removeChild(this.div);
-                    this.div = null;
-                  }
-                }
-              }
-
-              this.labelOverlay = new DistanceLabelOverlay(midpoint, miles);
-              this.labelOverlay.setMap(mapRef.current);
-              if (this.pinned) (this.labelOverlay as any).show();
-            }
-
-            private hidePath() {
-              if (this.pinned) return; // Keep if pinned
-              if (this.pathLine) {
-                this.pathLine.setMap(null);
-                this.pathLine = null;
-              }
-              if (this.labelOverlay) {
-                this.labelOverlay.setMap(null);
-                this.labelOverlay = null;
-              }
-            }
-
-            onAdd() {
-              this.div = document.createElement('div');
-              this.div.style.position = 'absolute';
-              this.div.style.cursor = 'pointer';
-              this.div.style.zIndex = '10';
-
-              const pin = document.createElement('div');
-              pin.style.width = '30px'; pin.style.height = '40px';
-              pin.style.backgroundImage = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23000000"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>')`;
-              pin.style.backgroundSize = 'contain'; pin.style.backgroundRepeat = 'no-repeat'; pin.style.transformOrigin = 'bottom center';
-              pin.style.animation = 'marker-bob 2s ease-in-out infinite';
-
-              if (startTickerLocation) {
-                this.isTooltipBelow = startTickerLocation.lat > this.activity.lat;
-              }
-
-              if (!document.getElementById('marker-animation-style')) {
-                const style = document.createElement('style');
-                style.id = 'marker-animation-style';
-                style.textContent = `@keyframes marker-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }`;
-                document.head.appendChild(style);
-              }
-
-              const stars = this.activity.rating ? `<div style="display: flex; gap: 2px;">${Array.from({ length: 5 }, (_, i) => `<svg style="width: 12px; height: 12px; color: ${i < Math.round(this.activity.rating) ? '#FBBF24' : '#E5E7EB'}" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>`).join('')}</div>` : '';
-              const statusColor = this.activity.isOpen ? '#10B981' : '#EF4444';
-              const statusText = this.activity.isOpen !== undefined ? (this.activity.isOpen ? 'Open Now' : 'Closed') : '';
-
-              this.tooltip = document.createElement('div');
-              this.tooltip.style.position = 'absolute';
-              if (this.isTooltipBelow) {
-                this.tooltip.style.top = '45px';
-                this.tooltip.style.transformOrigin = 'center top';
-              } else {
-                this.tooltip.style.bottom = '45px';
-                this.tooltip.style.transformOrigin = 'center bottom';
-              }
-              this.tooltip.style.left = '50%';
-              this.tooltip.style.transform = 'translateX(-50%) scale(0.95)'; this.tooltip.style.opacity = '0';
-              this.tooltip.style.visibility = 'hidden'; this.tooltip.style.backgroundColor = 'white';
-              this.tooltip.style.borderRadius = '12px'; this.tooltip.style.boxShadow = '0 10px 25px rgba(0,0,0,0.2)';
-              this.tooltip.style.width = '200px'; this.tooltip.style.padding = '8px';
-              this.tooltip.style.transition = 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-              this.tooltip.style.zIndex = '100'; this.tooltip.style.pointerEvents = 'none';
-
-              this.tooltip.innerHTML = `
-                ${this.activity.photoUrl ? `<img src="${this.activity.photoUrl}" style="width: 100%; height: 80px; object-fit: cover; border-radius: 8px; margin-bottom: 8px;" />` : ''}
-                <div style="font-weight: 700; font-size: 13px; color: #1F2937; margin-bottom: 2px; line-height: 1.2;">${this.activity.title}</div>
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">${stars}<span style="font-size: 10px; font-weight: 600; color: ${statusColor};">${statusText}</span></div>
-                <div style="font-size: 10px; color: #6B7280; text-transform: capitalize; margin-bottom: 8px;">${this.activity.category || 'Location'}</div>
-                <button id="remove-marker-btn-${this.activity.id}" style="display: block; width: 100%; padding: 6px 0; background: #FEE2E2; color: #DC2626; border: none; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; text-align: center; transition: background 0.15s;">Remove marker</button>
-              `;
-
-              this.div.appendChild(this.tooltip);
-              this.div.appendChild(pin);
-
-              const isTouch = 'ontouchstart' in window;
-              if (!isTouch) {
-                this.div.addEventListener('mouseover', () => {
-                  if (!this.pinned) {
-                    this.showTooltip();
-                    this.div!.style.zIndex = '500';
-                    this.showPath();
-                  }
-                });
-                this.div.addEventListener('mouseout', (e) => {
-                  if (!this.pinned) {
-                    const rel = e.relatedTarget as Node;
-                    if (this.tooltip && this.tooltip.contains(rel)) return;
-                    this.hideTooltip();
-                    this.hidePath();
-                  }
-                });
-              }
-
-              this.div.addEventListener('click', (e) => { e.stopPropagation(); if (this.pinned) this.unpinTooltip(); else this.pinTooltip(); });
-              this.tooltip.addEventListener('click', (e) => { e.stopPropagation(); if (this.pinned) { topZIndexRef.current += 1; this.div!.style.zIndex = topZIndexRef.current.toString(); } });
-              if (isTouch) this.div.addEventListener('touchend', (e) => { e.stopPropagation(); if (!this.pinned) this.pinTooltip(); });
-
-              this.tooltip.addEventListener('click', (e) => {
-                const btn = (e.target as HTMLElement).closest(`#remove-marker-btn-${this.activity.id}`);
-                if (btn) { e.stopPropagation(); onRemoveActivity?.(this.activity.id); }
-              });
-
-              unpinFunctionsRef.current.add(this.unpinTooltip);
-              this.getPanes()!.overlayMouseTarget.appendChild(this.div);
-            }
-
-            draw() {
-              if (!this.div) return;
-              const pos = this.getProjection().fromLatLngToDivPixel(new google.maps.LatLng(this.activity.lat, this.activity.lng));
-              if (pos) { this.div.style.left = pos.x - 15 + 'px'; this.div.style.top = pos.y - 40 + 'px'; }
-            }
-
-            onRemove() {
-              if (this.div) {
-                unpinFunctionsRef.current.delete(this.unpinTooltip);
-                if (this.pathLine) this.pathLine.setMap(null);
-                if (this.labelOverlay) this.labelOverlay.setMap(null);
-                this.div.parentNode?.removeChild(this.div);
-                this.div = null;
-              }
+          setText(text: string) {
+            this.text = text;
+            if (this.div) {
+              this.div.textContent = text;
             }
           }
-          const o = new ActivityMarkerOverlay(activity, mapRef.current!);
-          activityMarkersRef.current.set(activity.id, o);
+
+          setHighlighted(highlighted: boolean) {
+            if (!this.div) return;
+            this.div.style.opacity = highlighted ? '1' : '0.88';
+            this.div.style.transform = highlighted ? 'translate(-50%, -50%) scale(1.03)' : 'translate(-50%, -50%) scale(1)';
+            this.div.style.boxShadow = highlighted
+              ? '0 10px 26px rgba(2, 132, 199, 0.38)'
+              : '0 8px 20px rgba(14, 116, 144, 0.24)';
+          }
+
+          draw() {
+            if (!this.div) return;
+            const proj = this.getProjection();
+            const pixel = proj.fromLatLngToDivPixel(this.pos);
+            if (pixel) {
+              this.div.style.left = pixel.x + 'px';
+              this.div.style.top = pixel.y + 'px';
+            }
+          }
+
+          onRemove() {
+            if (this.div) {
+              this.div.parentNode?.removeChild(this.div);
+              this.div = null;
+            }
+          }
         }
+
+        class ActivityMarkerOverlay extends google.maps.OverlayView implements ActivityMarkerOverlayHandle {
+          private div: HTMLElement | null = null;
+          private tooltip: HTMLElement | null = null;
+          private pin: HTMLElement | null = null;
+          private pinned = false;
+          private labelOverlay: DistanceLabelOverlay | null = null;
+          private pathLine: google.maps.Polyline | null = null;
+          private isTooltipBelow = false;
+          private isMarkerHovered = false;
+          private isPathHovered = false;
+          private isExternallyHighlighted = false;
+
+          constructor(private activity: Activity, private map: google.maps.Map) {
+            super();
+            this.setMap(map);
+          }
+
+          getActivityId = () => this.activity.id;
+
+          public setHighlighted = (highlighted: boolean) => {
+            this.isExternallyHighlighted = highlighted;
+            this.syncHighlightState();
+          };
+
+          public unpinTooltip = () => {
+            if (this.pinned) {
+              this.pinned = false;
+              this.hideTooltip();
+              if (this.tooltip) this.tooltip.style.pointerEvents = 'none';
+              this.syncHighlightState();
+            }
+          };
+
+          private syncHighlightState() {
+            const isHighlighted = this.pinned || this.isMarkerHovered || this.isPathHovered || this.isExternallyHighlighted;
+
+            if (this.pathLine) {
+              this.pathLine.setOptions({
+                strokeColor: isHighlighted ? '#0EA5E9' : '#2563EB',
+                strokeOpacity: isHighlighted ? 0.92 : 0.55,
+                strokeWeight: isHighlighted ? 7 : 5,
+                zIndex: isHighlighted ? 1400 : 1000,
+              });
+            }
+
+            this.labelOverlay?.setHighlighted(isHighlighted);
+
+            if (this.pin) {
+              this.pin.style.filter = isHighlighted
+                ? 'drop-shadow(0 0 14px rgba(14, 165, 233, 0.65))'
+                : 'drop-shadow(0 3px 8px rgba(37, 99, 235, 0.25))';
+              this.pin.style.transform = isHighlighted ? 'scale(1.08)' : 'scale(1)';
+            }
+          }
+
+          private showTooltip() {
+            if (this.tooltip) {
+              this.tooltip.style.opacity = '1';
+              this.tooltip.style.visibility = 'visible';
+              this.tooltip.style.transform = 'translateX(-50%) scale(1)';
+            }
+          }
+
+          private hideTooltip() {
+            if (this.tooltip) {
+              this.tooltip.style.opacity = '0';
+              this.tooltip.style.visibility = 'hidden';
+              this.tooltip.style.transform = 'translateX(-50%) scale(0.95)';
+            }
+          }
+
+          private pinTooltip() {
+            this.pinned = true;
+            this.showTooltip();
+            if (this.tooltip) this.tooltip.style.pointerEvents = 'auto';
+            topZIndexRef.current += 1;
+            if (this.div) this.div.style.zIndex = topZIndexRef.current.toString();
+            this.syncHighlightState();
+          }
+
+          private ensurePath() {
+            if (!mapRef.current || !startLatLng || this.pathLine) return;
+
+            const end = new google.maps.LatLng(this.activity.lat, this.activity.lng);
+            this.pathLine = new google.maps.Polyline({
+              path: [startLatLng, end],
+              geodesic: true,
+              strokeColor: '#2563EB',
+              strokeOpacity: 0.55,
+              strokeWeight: 5,
+              clickable: true,
+              zIndex: 1000,
+              map: mapRef.current,
+            });
+
+            this.pathLine.addListener('click', (e: google.maps.PolyMouseEvent) => {
+              if (e.domEvent) e.domEvent.stopPropagation();
+              if (this.pinned) this.unpinTooltip(); else this.pinTooltip();
+            });
+
+            this.pathLine.addListener('mouseover', () => {
+              this.isPathHovered = true;
+              this.syncHighlightState();
+            });
+
+            this.pathLine.addListener('mouseout', () => {
+              this.isPathHovered = false;
+              this.syncHighlightState();
+            });
+
+            const midpoint = getOffsetMidpoint(this.activity);
+            this.labelOverlay = new DistanceLabelOverlay(midpoint, getDistanceText(this.activity));
+            this.labelOverlay.setMap(mapRef.current);
+            this.syncHighlightState();
+          }
+
+          onAdd() {
+            this.div = document.createElement('div');
+            this.div.style.position = 'absolute';
+            this.div.style.cursor = 'pointer';
+            this.div.style.zIndex = '10';
+
+            this.pin = document.createElement('div');
+            this.pin.style.width = '30px';
+            this.pin.style.height = '40px';
+            this.pin.style.backgroundImage = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23000000"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>')`;
+            this.pin.style.backgroundSize = 'contain';
+            this.pin.style.backgroundRepeat = 'no-repeat';
+            this.pin.style.transformOrigin = 'bottom center';
+            this.pin.style.animation = 'marker-bob 2s ease-in-out infinite';
+            this.pin.style.transition = 'transform 0.18s ease, filter 0.18s ease';
+
+            if (startTickerLocation) {
+              this.isTooltipBelow = startTickerLocation.lat > this.activity.lat;
+            }
+
+            if (!document.getElementById('marker-animation-style')) {
+              const style = document.createElement('style');
+              style.id = 'marker-animation-style';
+              style.textContent = `@keyframes marker-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }`;
+              document.head.appendChild(style);
+            }
+
+            const stars = this.activity.rating ? `<div style="display: flex; gap: 2px;">${Array.from({ length: 5 }, (_, i) => `<svg style="width: 12px; height: 12px; color: ${i < Math.round(this.activity.rating) ? '#FBBF24' : '#E5E7EB'}" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>`).join('')}</div>` : '';
+            const statusColor = this.activity.isOpen ? '#10B981' : '#EF4444';
+            const statusText = this.activity.isOpen !== undefined ? (this.activity.isOpen ? 'Open Now' : 'Closed') : '';
+
+            this.tooltip = document.createElement('div');
+            this.tooltip.style.position = 'absolute';
+            if (this.isTooltipBelow) {
+              this.tooltip.style.top = '45px';
+              this.tooltip.style.transformOrigin = 'center top';
+            } else {
+              this.tooltip.style.bottom = '45px';
+              this.tooltip.style.transformOrigin = 'center bottom';
+            }
+            this.tooltip.style.left = '50%';
+            this.tooltip.style.transform = 'translateX(-50%) scale(0.95)';
+            this.tooltip.style.opacity = '0';
+            this.tooltip.style.visibility = 'hidden';
+            this.tooltip.style.backgroundColor = 'white';
+            this.tooltip.style.borderRadius = '12px';
+            this.tooltip.style.boxShadow = '0 10px 25px rgba(0,0,0,0.2)';
+            this.tooltip.style.width = '200px';
+            this.tooltip.style.padding = '8px';
+            this.tooltip.style.transition = 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            this.tooltip.style.zIndex = '100';
+            this.tooltip.style.pointerEvents = 'none';
+
+            this.tooltip.innerHTML = `
+              ${this.activity.photoUrl ? `<img src="${this.activity.photoUrl}" style="width: 100%; height: 80px; object-fit: cover; border-radius: 8px; margin-bottom: 8px;" />` : ''}
+              <div style="font-weight: 700; font-size: 13px; color: #1F2937; margin-bottom: 2px; line-height: 1.2;">${this.activity.title}</div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">${stars}<span style="font-size: 10px; font-weight: 600; color: ${statusColor};">${statusText}</span></div>
+              <div style="font-size: 10px; color: #6B7280; text-transform: capitalize; margin-bottom: 8px;">${this.activity.category || 'Location'}</div>
+              <button id="remove-marker-btn-${this.activity.id}" style="display: block; width: 100%; padding: 6px 0; background: #FEE2E2; color: #DC2626; border: none; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; text-align: center; transition: background 0.15s;">Remove marker</button>
+            `;
+
+            this.div.appendChild(this.tooltip);
+            this.div.appendChild(this.pin);
+
+            const isTouch = 'ontouchstart' in window;
+            if (!isTouch) {
+              this.div.addEventListener('mouseover', () => {
+                this.isMarkerHovered = true;
+                this.showTooltip();
+                if (this.div) this.div.style.zIndex = '500';
+                this.syncHighlightState();
+              });
+              this.div.addEventListener('mouseout', (e) => {
+                this.isMarkerHovered = false;
+                if (!this.pinned) {
+                  const rel = e.relatedTarget as Node;
+                  if (this.tooltip && this.tooltip.contains(rel)) return;
+                  this.hideTooltip();
+                }
+                this.syncHighlightState();
+              });
+            }
+
+            this.div.addEventListener('click', (e) => {
+              e.stopPropagation();
+              if (this.pinned) this.unpinTooltip(); else this.pinTooltip();
+            });
+            this.tooltip.addEventListener('click', (e) => {
+              e.stopPropagation();
+              if (this.pinned && this.div) {
+                topZIndexRef.current += 1;
+                this.div.style.zIndex = topZIndexRef.current.toString();
+              }
+            });
+            if (isTouch) {
+              this.div.addEventListener('touchend', (e) => {
+                e.stopPropagation();
+                if (!this.pinned) this.pinTooltip();
+              });
+            }
+
+            this.tooltip.addEventListener('click', (e) => {
+              const btn = (e.target as HTMLElement).closest(`#remove-marker-btn-${this.activity.id}`);
+              if (btn) {
+                e.stopPropagation();
+                onRemoveActivity?.(this.activity.id);
+              }
+            });
+
+            unpinFunctionsRef.current.add(this.unpinTooltip);
+            this.getPanes()!.overlayMouseTarget.appendChild(this.div);
+            this.ensurePath();
+            this.syncHighlightState();
+          }
+
+          draw() {
+            if (!this.div) return;
+            const pos = this.getProjection().fromLatLngToDivPixel(new google.maps.LatLng(this.activity.lat, this.activity.lng));
+            if (pos) {
+              this.div.style.left = pos.x - 15 + 'px';
+              this.div.style.top = pos.y - 40 + 'px';
+            }
+          }
+
+          onRemove() {
+            if (this.div) {
+              unpinFunctionsRef.current.delete(this.unpinTooltip);
+              if (this.pathLine) this.pathLine.setMap(null);
+              if (this.labelOverlay) this.labelOverlay.setMap(null);
+              this.div.parentNode?.removeChild(this.div);
+              this.div = null;
+            }
+          }
+        }
+
+        const overlay = new ActivityMarkerOverlay(activity, mapRef.current!);
+        overlay.setHighlighted(hoveredActivityId === activity.id);
+        activityMarkersRef.current.set(activity.id, overlay);
       });
-    }, [markedActivities, startTickerLocation]);
+    }, [hoveredActivityId, markedActivities, onRemoveActivity, startTickerLocation]);
+
+    useEffect(() => {
+      activityMarkersRef.current.forEach((overlay, id) => {
+        overlay.setHighlighted(id === hoveredActivityId);
+      });
+    }, [hoveredActivityId]);
 
     useImperativeHandle(ref, () => ({
       addMarkerAtLocation: (lat, lng, title, bounds) => {

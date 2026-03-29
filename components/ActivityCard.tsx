@@ -8,6 +8,8 @@ interface ActivityCardProps {
   isFavorite?: boolean;
   onToggleFavorite?: (activity: Activity) => void;
   isMarked?: boolean;
+  isHovered?: boolean;
+  onHoverChange?: (activityId: string | null) => void;
   onToggleMark?: (activity: Activity) => void;
 }
 
@@ -18,6 +20,8 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
   isFavorite,
   onToggleFavorite,
   isMarked,
+  isHovered,
+  onHoverChange,
   onToggleMark
 }) => {
 
@@ -43,7 +47,14 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
   return (
     <div
       onClick={() => onViewDetails(activity)}
-      className="group relative block bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all border-indigo-50 cursor-pointer hover:bg-indigo-50/30 active:scale-95"
+      onMouseEnter={() => isMarked && onHoverChange?.(activity.id)}
+      onMouseLeave={() => isMarked && onHoverChange?.(null)}
+      onFocus={() => isMarked && onHoverChange?.(activity.id)}
+      onBlur={() => isMarked && onHoverChange?.(null)}
+      className={`group relative block rounded-2xl p-4 shadow-sm transition-all border-indigo-50 cursor-pointer active:scale-95 ${isHovered
+        ? 'bg-indigo-50 border-indigo-300 shadow-md ring-2 ring-sky-200'
+        : 'bg-white border border-gray-100 hover:bg-indigo-50/30 hover:shadow-md'
+        }`}
     >
       {/* Favorite Button */}
       <button

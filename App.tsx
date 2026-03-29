@@ -21,8 +21,22 @@ import Toast from './components/Toast';
 import { Activity } from './types';
 import { searchNearbyActivities } from './services/placesService';
 import { getSession, onAuthStateChange } from './services/authService';
+import type { ReservationDraft } from './types/planner';
 
 type LatLng = { lat: number; lng: number };
+type PlannerRoute = '/planner' | '/planner/generate' | '/planner/manual' | '/planner/reserve';
+
+const getPageFromPath = (pathname: string): AppPage => {
+  if (pathname.startsWith('/planner')) return 'planner';
+  if (pathname === '/favorites') return 'favorites';
+  return 'map';
+};
+
+const getPathForPage = (page: AppPage): string => {
+  if (page === 'planner') return '/planner';
+  if (page === 'favorites') return '/favorites';
+  return '/';
+};
 
 const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371000; // Earth's radius in meters
@@ -42,6 +56,8 @@ interface MapContainerHandle {
   panToLocation: (lat: number, lng: number) => void;
   getCircle: () => { center: LatLng; radiusMeters: number } | null;
   clearSearchCircle: () => void;
+  showTemporaryMarker: (lat: number, lng: number) => void;
+  clearTemporaryMarker: () => void;
 }
 
 const App: React.FC = () => {
@@ -62,11 +78,12 @@ const App: React.FC = () => {
   const mapContainerRef = useRef<MapContainerHandle | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isGuestMode, setIsGuestMode] = useState(false);
-  const [activePage, setActivePage] = useState<AppPage>('map');
+  const [currentPath, setCurrentPath] = useState(() => window.location.pathname || '/');
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [favorites, setFavorites] = useState<Activity[]>([]);
   const [markedActivities, setMarkedActivities] = useState<Activity[]>([]);
+  const [hoveredActivityId, setHoveredActivityId] = useState<string | null>(null);
   const [regionHistory, setRegionHistory] = useState<{ center: LatLng; radiusMeters: number }[]>([]);
   const [isRegionDirty, setIsRegionDirty] = useState(true);
   const [isRegionLocked, setIsRegionLocked] = useState(false);
@@ -91,9 +108,33 @@ const App: React.FC = () => {
   const [authTransition, setAuthTransition] = useState<'idle' | 'fading'>('idle');
 
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
+  const [reservationDraft, setReservationDraft] = useState<ReservationDraft | null>(null);
+  const activePage = getPageFromPath(currentPath);
+  const plannerRoute: PlannerRoute =
+    currentPath === '/planner/generate' || currentPath === '/planner/manual' || currentPath === '/planner/reserve'
+      ? currentPath
+      : '/planner';
+
+  const navigateToPath = useCallback((nextPath: string) => {
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({}, '', nextPath);
+    }
+    setCurrentPath(nextPath);
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, []);
+
+  const handlePageNavigate = useCallback((page: AppPage) => {
+    navigateToPath(getPathForPage(page));
+  }, [navigateToPath]);
 
 
   useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname || '/');
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
     // Set up BroadcastChannel
     authChannel.current = new BroadcastChannel('maptivity_auth_handoff');
     authChannel.current.onmessage = (event) => {
@@ -121,6 +162,7 @@ const App: React.FC = () => {
     });
 
     return () => {
+      window.removeEventListener('popstate', handlePopState);
       subscription.unsubscribe();
       authChannel.current?.close();
     };
@@ -353,6 +395,7 @@ const App: React.FC = () => {
     setMarkedActivities((prev) => {
       const isMarked = prev.some((a) => a.id === activity.id);
       if (isMarked) {
+        setHoveredActivityId((current) => current === activity.id ? null : current);
         return prev.filter((a) => a.id !== activity.id);
       }
       return [...prev, activity];
@@ -527,7 +570,7 @@ const App: React.FC = () => {
 
   return (
     <div className="relative h-screen w-full flex flex-col overflow-hidden font-sans">
-      <Header activePage={activePage} onNavigate={setActivePage} />
+      <Header activePage={activePage} onNavigate={handlePageNavigate} />
 
       {/*
         Stack main page and overlay in the same layer so they crossfade
@@ -559,7 +602,11 @@ const App: React.FC = () => {
                 onRadiusChange={handleRadiusChange}
                 onRegionChange={handleRegionChange}
                 markedActivities={markedActivities}
-                onRemoveActivity={(id) => setMarkedActivities(prev => prev.filter(a => a.id !== id))}
+                hoveredActivityId={hoveredActivityId}
+                onRemoveActivity={(id) => {
+                  setMarkedActivities(prev => prev.filter(a => a.id !== id));
+                  setHoveredActivityId(current => current === id ? null : current);
+                }}
                 circle={circle}
                 onRevert={handleRevertRegion}
                 canRevert={regionHistory.length > 0}
@@ -582,11 +629,9 @@ const App: React.FC = () => {
                 favorites={favorites}
                 onToggleFavorite={toggleFavorite}
                 markedActivityIds={markedActivities.map(a => a.id)}
-                onToggleMark={(activity) => setMarkedActivities(prev =>
-                  prev.some(a => a.id === activity.id)
-                    ? prev.filter(a => a.id !== activity.id)
-                    : [...prev, activity]
-                )}
+                hoveredActivityId={hoveredActivityId}
+                onActivityHoverChange={setHoveredActivityId}
+                onToggleMark={toggleMarkedActivity}
                 error={error}
                 filters={filters}
                 onFiltersChange={setFilters}
@@ -706,7 +751,15 @@ const App: React.FC = () => {
           )}
 
           {/* ── Planner page ───────────────────────────────────────── */}
-          {activePage === 'planner' && <PlannerPage />}
+          {activePage === 'planner' && (
+            <PlannerPage
+              routePath={plannerRoute}
+              onNavigate={navigateToPath as (path: PlannerRoute) => void}
+              favorites={favorites}
+              reservationDraft={reservationDraft}
+              onPrepareReservationDraft={setReservationDraft}
+            />
+          )}
 
           {/* ── Favorites page ─────────────────────────────────────── */}
           {activePage === 'favorites' && (
