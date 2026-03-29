@@ -17,13 +17,14 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { discoverPlannerActivities } from '../../services/manualPlannerService';
-import type { Activity, Plan, PlannerLocation, ReservationDraft } from '../../types/planner';
+import type { Activity, Plan, PlannerLocation, ReservationDraft, SavedPlannerPlan } from '../../types/planner';
 import type { Activity as SavedActivity } from '../../types';
 
 interface ManualPlannerPageProps {
   onNavigate: (path: '/planner' | '/planner/generate' | '/planner/manual' | '/planner/reserve') => void;
   favorites: SavedActivity[];
   onPrepareReservationDraft: (draft: ReservationDraft) => void;
+  onSavePlan: (plan: SavedPlannerPlan) => void;
 }
 
 interface PlaceSuggestion {
@@ -219,13 +220,13 @@ function PlannerLocationSearch({
   return (
     <div className="relative">
       <label className="block">
-        <span className="mb-2 block text-sm font-bold uppercase tracking-[0.14em] text-slate-500">
+        {/* <span className="mb-2 block text-sm font-bold uppercase tracking-[0.14em] text-slate-500">
           Destination
-        </span>
+        </span> */}
         <input
           value={value}
           onChange={(event) => handleInputChange(event.target.value)}
-          placeholder="Search a city or neighborhood"
+          placeholder="Search a city or location"
           disabled={disabled}
           className="w-full rounded-[20px] border border-slate-200 bg-white px-5 py-4 text-base text-slate-800 shadow-inner outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-50"
         />
@@ -402,10 +403,29 @@ const DayDropZone: React.FC<{
   );
 };
 
+function buildSavedManualPlan(plan: Plan, destination: PlannerLocation | null): SavedPlannerPlan {
+  const activityCount = plan.days.reduce((count, day) => count + day.activities.length, 0);
+
+  return {
+    kind: 'manual',
+    id: `saved-manual-${plan.id}-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    title: destination ? `${destination.name} custom plan` : 'Custom manual plan',
+    subtitle: destination
+      ? `A hand-built itinerary centered around ${destination.name}.`
+      : 'A hand-built itinerary created with the manual planner.',
+    destination,
+    days: plan.days.length,
+    activityCount,
+    plan,
+  };
+}
+
 const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
   onNavigate,
   favorites,
   onPrepareReservationDraft,
+  onSavePlan,
 }) => {
   const [locationQuery, setLocationQuery] = useState('');
   const [selectedLocation, setSelectedLocation] = useState<PlannerLocation | null>(null);
@@ -413,6 +433,7 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [plan, setPlan] = useState<Plan>({
     id: 'manual-plan',
     days: [{ day: 1, activities: [] }],
@@ -436,6 +457,8 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
     () => favorites.map(mapFavoriteToPlannerActivity),
     [favorites],
   );
+
+  const activityDiscoveryItems = showFavoritesOnly ? favoriteActivities : discoveredActivities;
 
   const loadActivities = async (location: PlannerLocation) => {
     setIsLoadingActivities(true);
@@ -557,6 +580,42 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
     setActiveDay(nextDayNumber);
   };
 
+  const handleRemoveDay = (dayNumber: number) => {
+    setPlan((currentPlan) => {
+      if (currentPlan.days.length === 1) {
+        return currentPlan;
+      }
+
+      const remainingDays = currentPlan.days
+        .filter((day) => day.day !== dayNumber)
+        .map((day, index) => ({
+          ...day,
+          day: index + 1,
+        }));
+
+      return {
+        ...currentPlan,
+        days: remainingDays,
+      };
+    });
+
+    setActiveDay((currentActiveDay) => {
+      if (plan.days.length === 1) {
+        return currentActiveDay;
+      }
+
+      if (currentActiveDay < dayNumber) {
+        return currentActiveDay;
+      }
+
+      if (currentActiveDay > dayNumber) {
+        return currentActiveDay - 1;
+      }
+
+      return Math.max(1, currentActiveDay - 1);
+    });
+  };
+
   const handleRemoveActivity = (dayNumber: number, activityId: string) => {
     setPlan((currentPlan) => ({
       ...currentPlan,
@@ -577,12 +636,17 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
     onNavigate('/planner/reserve');
   };
 
+  const handleSavePlan = () => {
+    if (plannedCount === 0) return;
+    onSavePlan(buildSavedManualPlan(plan, selectedLocation));
+  };
+
   return (
     <div className="flex-1 min-h-0 overflow-y-auto bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(251,191,36,0.16),_transparent_28%),linear-gradient(180deg,#fbfdff_0%,#eefbf6_52%,#f8fafc_100%)] px-6 py-10 sm:px-10">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
         <section className="rounded-[36px] border border-white/60 bg-white/80 p-8 shadow-[0_24px_80px_rgba(15,23,42,0.1)] backdrop-blur">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="inline-flex items-center rounded-full bg-emerald-100 px-4 py-1 text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
+            <div className="inline-flex items-center rounded-full bg-emerald-100 px-4 py-1 text-sm font-bold uppercase tracking-[0.1em] text-emerald-700">
               Build Your Own
             </div>
             <button
@@ -597,33 +661,126 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
           <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
             <div>
               <h2 className="text-4xl font-black tracking-tight text-slate-950">
-                Build a trip from real nearby places.
+                Plan Your Perfect Trip, Your Way
               </h2>
               <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
-                Search a destination, pull in live activities from Google Places, and drag them
-                into day-by-day plans that are already structured for map markers later.
+                Search for places or Select activities that you've favoriated in the app, 
+                drag them to the planning canvas, add days to your trip, and reorder them 
+                until your itinerary feels just right.
               </p>
             </div>
 
-            <div className="rounded-[28px] border border-emerald-100 bg-emerald-50/70 p-5">
+            {/* <div className="rounded-[28px] border border-emerald-100 bg-emerald-50/70 p-5">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Manual flow</p>
               <div className="mt-4 space-y-3 text-sm text-slate-600">
                 <p>1. Pick a real location with Google Places autocomplete</p>
                 <p>2. Browse live attractions, restaurants, parks, museums, and nightlife</p>
                 <p>3. Drag activities into your itinerary and reorder them by day</p>
               </div>
+            </div> */}
+          </div>
+
+          {/* <div className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+            <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Saved places</p>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Import activities you already saved in Favorites into the currently selected day.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsFavoritesOpen((current) => !current)}
+                  className="rounded-full bg-rose-500 px-4 py-2 text-sm font-black text-white transition hover:bg-rose-600"
+                >
+                  {isFavoritesOpen ? 'Hide Favorites' : 'Import from Favorites'}
+                </button>
+              </div>
+
+              {isFavoritesOpen && (
+                <div className="mt-5">
+                  {favoriteActivities.length > 0 ? (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {favoriteActivities.map((activity) => {
+                        const alreadyPlanned = plannedActivityIds.has(activity.id);
+
+                        return (
+                          <div
+                            key={activity.id}
+                            className={`rounded-[22px] border p-4 transition ${
+                              alreadyPlanned
+                                ? 'border-slate-200 bg-slate-50'
+                                : 'border-rose-100 bg-rose-50/50'
+                            }`}
+                          >
+                            <div className="flex gap-4">
+                              <div className="h-18 w-18 shrink-0 overflow-hidden rounded-2xl bg-slate-100">
+                                {activity.photoUrl ? (
+                                  <img src={activity.photoUrl} alt={activity.name} className="h-full w-full object-cover" />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                                    Favorite
+                                  </div>
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-start justify-between gap-3">
+                                  <p className="text-sm font-black text-slate-900">{activity.name}</p>
+                                  {activity.rating != null && (
+                                    <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-700">
+                                      {activity.rating.toFixed(1)}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{activity.address}</p>
+                                <div className="mt-4 flex flex-wrap items-center gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleImportFavorite(activity)}
+                                    disabled={alreadyPlanned}
+                                    className="rounded-full bg-slate-900 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                                  >
+                                    {alreadyPlanned ? 'Already in Plan' : `Add to Day ${activeDay}`}
+                                  </button>
+                                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-rose-500">
+                                    Saved favorite
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                      You don't have any favorites yet. Save places from the map to view here
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          </div>
 
-          <div className="mt-8">
-            <PlannerLocationSearch
-              value={locationQuery}
-              onValueChange={setLocationQuery}
-              onLocationSelected={handleLocationSelected}
-            />
-          </div>
+            {selectedLocation ? (
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-5 py-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Selected destination</p>
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <p className="text-lg font-black text-slate-900">{selectedLocation.name}</p>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500">
+                    {selectedLocation.lat.toFixed(4)}, {selectedLocation.lng.toFixed(4)}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-slate-600">{selectedLocation.address}</p>
+              </div>
+            ) : (
+              <div className="rounded-[24px] border border-dashed border-slate-200 bg-white/70 px-5 py-8 text-sm leading-7 text-slate-500">
+                Pick a destination from Activity Discovery to anchor the live places panel and your manual itinerary.
+              </div>
+            )}
+          </div> */}
 
-          <div className="mt-5 flex flex-wrap items-center gap-3">
+          {/* <div className="mt-5 flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={handleReservePlan}
@@ -635,101 +792,7 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
             <p className="text-sm text-slate-500">
               Open a future AI-agent reservation queue for the activities currently in your plan.
             </p>
-          </div>
-
-          <div className="mt-5 rounded-[24px] border border-slate-200 bg-white px-5 py-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Saved places</p>
-                <p className="mt-2 text-sm text-slate-600">
-                  Import activities you already saved in Favorites into the currently selected day.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsFavoritesOpen((current) => !current)}
-                className="rounded-full bg-rose-500 px-4 py-2 text-sm font-black text-white transition hover:bg-rose-600"
-              >
-                {isFavoritesOpen ? 'Hide Favorites' : 'Import from Favorites'}
-              </button>
-            </div>
-
-            {isFavoritesOpen && (
-              <div className="mt-5">
-                {favoriteActivities.length > 0 ? (
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {favoriteActivities.map((activity) => {
-                      const alreadyPlanned = plannedActivityIds.has(activity.id);
-
-                      return (
-                        <div
-                          key={activity.id}
-                          className={`rounded-[22px] border p-4 transition ${
-                            alreadyPlanned
-                              ? 'border-slate-200 bg-slate-50'
-                              : 'border-rose-100 bg-rose-50/50'
-                          }`}
-                        >
-                          <div className="flex gap-4">
-                            <div className="h-18 w-18 shrink-0 overflow-hidden rounded-2xl bg-slate-100">
-                              {activity.photoUrl ? (
-                                <img src={activity.photoUrl} alt={activity.name} className="h-full w-full object-cover" />
-                              ) : (
-                                <div className="flex h-full w-full items-center justify-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                                  Favorite
-                                </div>
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-start justify-between gap-3">
-                                <p className="text-sm font-black text-slate-900">{activity.name}</p>
-                                {activity.rating != null && (
-                                  <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-700">
-                                    {activity.rating.toFixed(1)}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{activity.address}</p>
-                              <div className="mt-4 flex flex-wrap items-center gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => handleImportFavorite(activity)}
-                                  disabled={alreadyPlanned}
-                                  className="rounded-full bg-slate-900 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                                >
-                                  {alreadyPlanned ? 'Already in Plan' : `Add to Day ${activeDay}`}
-                                </button>
-                                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-rose-500">
-                                  Saved favorite
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                    You do not have any favorites yet. Save places from the map, then import them here.
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {selectedLocation && (
-            <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 px-5 py-4">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Selected destination</p>
-              <div className="mt-2 flex flex-wrap items-center gap-3">
-                <p className="text-lg font-black text-slate-900">{selectedLocation.name}</p>
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500">
-                  {selectedLocation.lat.toFixed(4)}, {selectedLocation.lng.toFixed(4)}
-                </span>
-              </div>
-              <p className="mt-2 text-sm text-slate-600">{selectedLocation.address}</p>
-            </div>
-          )}
+          </div> */}
 
           {error && (
             <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -749,17 +812,50 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
         >
           <div className="grid gap-8 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
             <section className="rounded-[32px] border border-slate-200 bg-white/85 p-6 shadow-[0_18px_70px_rgba(15,23,42,0.08)]">
-              <div className="mb-5 flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Activity Discovery</p>
-                  <h3 className="mt-2 text-2xl font-black text-slate-900">Live Places</h3>
-                </div>
-                <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                  {discoveredActivities.length} found
+              <div className="mb-5">
+                <p className="text-sm font-bold uppercase tracking-[0.1em] text-slate-500">Activity Discovery</p>
+                <div className="mt-5 inline-flex rounded-full border border-slate-200 bg-slate-100 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowFavoritesOnly(false)}
+                    className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.14em] transition ${
+                      !showFavoritesOnly
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    Search By Location
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowFavoritesOnly(true)}
+                    className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.14em] transition ${
+                      showFavoritesOnly
+                        ? 'bg-rose-500 text-white shadow-sm hover:bg-rose-600'
+                        : 'text-slate-500 hover:text-rose-600'
+                    }`}
+                  >
+                    Show Favorites
+                  </button>
                 </div>
               </div>
 
-              {isLoadingActivities ? (
+              <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  {showFavoritesOnly ? null : (
+                    <PlannerLocationSearch
+                      value={locationQuery}
+                      onValueChange={setLocationQuery}
+                      onLocationSelected={handleLocationSelected}
+                    />
+                  )}
+                </div>
+                <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                  {activityDiscoveryItems.length} found
+                </div>
+              </div>
+
+              {isLoadingActivities && !showFavoritesOnly ? (
                 <div className="space-y-4">
                   {[0, 1, 2].map((item) => (
                     <div key={item} className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
@@ -769,9 +865,9 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                     </div>
                   ))}
                 </div>
-              ) : discoveredActivities.length > 0 ? (
+              ) : activityDiscoveryItems.length > 0 ? (
                 <div className="grid max-h-[820px] gap-4 overflow-y-auto pr-1">
-                  {discoveredActivities.map((activity) => (
+                  {activityDiscoveryItems.map((activity) => (
                     <div key={activity.id} className="relative">
                       <DiscoveryCard activity={activity} />
                       {plannedActivityIds.has(activity.id) && (
@@ -784,7 +880,9 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                 </div>
               ) : (
                 <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-16 text-center text-sm leading-7 text-slate-500">
-                  Select a location to load real nearby places from Google Places.
+                  {showFavoritesOnly
+                    ? 'No favorites saved from the map'
+                    : 'Select a location to load the most popular nearby places'}
                 </div>
               )}
             </section>
@@ -793,7 +891,7 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">Planning Canvas</p>
-                  <h3 className="mt-2 text-2xl font-black">Your Itinerary</h3>
+                  <h3 className="mt-2 text-2xl font-black">Trip Itinerary</h3>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200">
@@ -801,8 +899,16 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                   </span>
                   <button
                     type="button"
+                    onClick={handleSavePlan}
+                    disabled={plannedCount === 0}
+                    className="rounded-full bg-white px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Save to My Plans
+                  </button>
+                  <button
+                    type="button"
                     onClick={handleAddDay}
-                    className="rounded-full bg-emerald-400 px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-emerald-300"
+                    className="rounded-full bg-emerald-400 px-4 py-2 text-md font-black text-slate-950 transition hover:bg-emerald-300"
                   >
                     Add Day
                   </button>
@@ -839,9 +945,20 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                             {day.activities.length > 0 ? 'Drag to reorder your stops' : 'Drop activities here'}
                           </h4>
                         </div>
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                          {day.activities.length} stop{day.activities.length === 1 ? '' : 's'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                            {day.activities.length} stop{day.activities.length === 1 ? '' : 's'}
+                          </span>
+                          {plan.days.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveDay(day.day)}
+                              className="rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-600 transition hover:bg-rose-100"
+                            >
+                              Remove Day
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {day.activities.length > 0 ? (
@@ -850,13 +967,23 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                           strategy={rectSortingStrategy}
                         >
                           <div className="space-y-4">
-                            {day.activities.map((activity) => (
-                              <PlannedActivityCard
-                                key={activity.id}
-                                day={day.day}
-                                activity={activity}
-                                onRemove={() => handleRemoveActivity(day.day, activity.id)}
-                              />
+                            {day.activities.map((activity, index) => (
+                              <React.Fragment key={activity.id}>
+                                <PlannedActivityCard
+                                  day={day.day}
+                                  activity={activity}
+                                  onRemove={() => handleRemoveActivity(day.day, activity.id)}
+                                />
+                                {index < day.activities.length - 1 && (
+                                  <div className="flex justify-center">
+                                    <div className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-100 px-3 py-2 text-slate-500 shadow-sm">
+                                      <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
+                                        <path d="M12 4a1 1 0 0 1 1 1v10.59l3.3-3.29a1 1 0 1 1 1.4 1.41l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 0 1 1.4-1.41L11 15.59V5a1 1 0 0 1 1-1Z" />
+                                      </svg>
+                                    </div>
+                                  </div>
+                                )}
+                              </React.Fragment>
                             ))}
                           </div>
                         </SortableContext>

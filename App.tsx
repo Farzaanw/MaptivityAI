@@ -14,6 +14,7 @@ const AuthOverlay = React.lazy(() => import('./components/AuthOverlay'));
 const ResetPasswordOverlay = React.lazy(() => import('./components/ResetPasswordOverlay'));
 const PlannerPage = React.lazy(() => import('./components/PlannerPage'));
 const FavoritesPage = React.lazy(() => import('./components/FavoritesPage'));
+const MyPlansPage = React.lazy(() => import('./components/MyPlansPage'));
 const DetailsSidebar = React.lazy(() => import('./components/DetailsSidebar'));
 import Toast from './components/Toast';
 
@@ -21,22 +22,26 @@ import Toast from './components/Toast';
 import { Activity } from './types';
 import { searchNearbyActivities } from './services/placesService';
 import { getSession, onAuthStateChange } from './services/authService';
-import type { ReservationDraft } from './types/planner';
+import type { ReservationDraft, SavedPlannerPlan } from './types/planner';
 
 type LatLng = { lat: number; lng: number };
 type PlannerRoute = '/planner' | '/planner/generate' | '/planner/manual' | '/planner/reserve';
 
 const getPageFromPath = (pathname: string): AppPage => {
   if (pathname.startsWith('/planner')) return 'planner';
+  if (pathname === '/my-plans') return 'my-plans';
   if (pathname === '/favorites') return 'favorites';
   return 'map';
 };
 
 const getPathForPage = (page: AppPage): string => {
   if (page === 'planner') return '/planner';
+  if (page === 'my-plans') return '/my-plans';
   if (page === 'favorites') return '/favorites';
   return '/';
 };
+
+const MY_PLANS_STORAGE_KEY = 'maptivityMyPlans';
 
 const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371000; // Earth's radius in meters
@@ -109,6 +114,16 @@ const App: React.FC = () => {
 
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
   const [reservationDraft, setReservationDraft] = useState<ReservationDraft | null>(null);
+  const [savedPlans, setSavedPlans] = useState<SavedPlannerPlan[]>(() => {
+    try {
+      const raw = localStorage.getItem(MY_PLANS_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as SavedPlannerPlan[];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
   const activePage = getPageFromPath(currentPath);
   const plannerRoute: PlannerRoute =
     currentPath === '/planner/generate' || currentPath === '/planner/manual' || currentPath === '/planner/reserve'
@@ -126,6 +141,15 @@ const App: React.FC = () => {
   const handlePageNavigate = useCallback((page: AppPage) => {
     navigateToPath(getPathForPage(page));
   }, [navigateToPath]);
+
+  useEffect(() => {
+    localStorage.setItem(MY_PLANS_STORAGE_KEY, JSON.stringify(savedPlans));
+  }, [savedPlans]);
+
+  const handleSavePlan = useCallback((plan: SavedPlannerPlan) => {
+    setSavedPlans((current) => [plan, ...current]);
+    setToast({ message: 'Saved to My Plans', visible: true });
+  }, []);
 
 
   useEffect(() => {
@@ -758,7 +782,12 @@ const App: React.FC = () => {
               favorites={favorites}
               reservationDraft={reservationDraft}
               onPrepareReservationDraft={setReservationDraft}
+              onSavePlan={handleSavePlan}
             />
+          )}
+
+          {activePage === 'my-plans' && (
+            <MyPlansPage plans={savedPlans} />
           )}
 
           {/* ── Favorites page ─────────────────────────────────────── */}

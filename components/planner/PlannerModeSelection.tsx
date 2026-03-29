@@ -16,11 +16,11 @@ const PlannerModeSelection: React.FC<PlannerModeSelectionProps> = ({ onNavigate 
             Planner
           </div>
           <h2 className="mt-6 max-w-3xl text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
-            Choose how you want to build your next itinerary.
+            Plan Your Next Trip!
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
-            Start with AI-generated ideas or build the whole trip yourself using live activities
-            from Google Places around a real destination.
+            Traveling somewhere new? Plan your full trip iternary with either our AI-powered trip planner 
+            or our manual planner, where you can organize, customize, and map out your perfect trip. 
           </p>
         </section>
 
@@ -37,14 +37,13 @@ const PlannerModeSelection: React.FC<PlannerModeSelectionProps> = ({ onNavigate 
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364 6.364-2.121-2.121M8.757 8.757 6.636 6.636m11.728 0-2.121 2.121M8.757 15.243l-2.121 2.121" />
                 </svg>
               </div>
-              <p className="mt-8 text-xs font-black uppercase tracking-[0.22em] text-sky-700">AI Planning</p>
-              <h3 className="mt-3 text-3xl font-black tracking-tight text-slate-950">Generate Plan</h3>
+              <h3 className="mt-5 text-3xl font-black tracking-tight text-slate-950">Generate Plan</h3>
               <p className="mt-4 max-w-lg text-base leading-7 text-slate-600">
-                Let AI create a personalized itinerary from your prompt, then review polished
-                plan options and map the stops you like.
+                Let AI create a personalized itinerary based on your preferences, 
+                then review the plan to polish it to your liking. 
               </p>
-              <div className="mt-8 inline-flex items-center gap-3 rounded-full bg-white/85 px-5 py-3 text-sm font-bold text-slate-900">
-                Open AI planner
+              <div className="mt-6 inline-flex items-center gap-3 rounded-full bg-white/100 px-3 py-3 text-sm font-bold text-slate-900">
+                Start Generating
                 <span className="text-sky-600 transition-transform duration-300 group-hover:translate-x-1">→</span>
               </div>
             </div>
@@ -62,13 +61,11 @@ const PlannerModeSelection: React.FC<PlannerModeSelectionProps> = ({ onNavigate 
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10m-12 9h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2Z" />
                 </svg>
               </div>
-              <p className="mt-8 text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Manual Planning</p>
-              <h3 className="mt-3 text-3xl font-black tracking-tight text-slate-950">Build Your Own</h3>
+              <h3 className="mt-5 text-3xl font-black tracking-tight text-slate-950">Build Your Own</h3>
               <p className="mt-4 max-w-lg text-base leading-7 text-slate-600">
-                Create your own plan by selecting activities. Search a destination, pull in real
-                places from Google Maps, and drag them into your itinerary.
+                Create your own plan by selecting activities using drag-and-drop to manually organize your plan.
               </p>
-              <div className="mt-8 inline-flex items-center gap-3 rounded-full bg-white/85 px-5 py-3 text-sm font-bold text-slate-900">
+              <div className="mt-6 inline-flex items-center gap-3 rounded-full bg-white/100 px-3 py-3 text-sm font-bold text-slate-900">
                 Start building
                 <span className="text-emerald-600 transition-transform duration-300 group-hover:translate-x-1">→</span>
               </div>

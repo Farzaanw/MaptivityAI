@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { getSession, signOut, onAuthStateChange } from '../services/authService';
 import type { User } from '@supabase/supabase-js';
 
-export type AppPage = 'map' | 'planner' | 'favorites';
+export type AppPage = 'map' | 'planner' | 'favorites' | 'my-plans';
 
 // ─── Default avatar options ───────────────────────────────────────────────────
 const DEFAULT_AVATARS = [
@@ -322,6 +322,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, onNavigate }) => {
             {([
               { id: 'map', label: 'Map' },
               { id: 'planner', label: 'Planner' },
+              { id: 'my-plans', label: 'My Plans' },
               { id: 'favorites', label: 'Favorites' },
             ] as { id: AppPage; label: string }[]).map(({ id, label }) => (
               <button

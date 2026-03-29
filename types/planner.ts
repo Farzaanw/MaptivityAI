@@ -109,3 +109,29 @@ export interface ReservationDraft {
   source: 'generated' | 'manual';
   candidates: ReservationCandidate[];
 }
+
+export interface SavedGeneratedPlannerPlan {
+  kind: 'generated';
+  id: string;
+  createdAt: string;
+  title: string;
+  subtitle: string;
+  prompt: string;
+  days: number;
+  activityCount: number;
+  plan: GeneratedPlan;
+}
+
+export interface SavedManualPlannerPlan {
+  kind: 'manual';
+  id: string;
+  createdAt: string;
+  title: string;
+  subtitle: string;
+  destination: PlannerLocation | null;
+  days: number;
+  activityCount: number;
+  plan: Plan;
+}
+
+export type SavedPlannerPlan = SavedGeneratedPlannerPlan | SavedManualPlannerPlan;

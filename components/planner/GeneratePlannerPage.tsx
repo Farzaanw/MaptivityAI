@@ -2,14 +2,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import PlannerMap from './PlannerMap';
 import { buildMarkerData } from '../../services/plannerGeocoding';
 import { generateItinerary } from '../../services/plannerService';
-import type { GeneratedPlan, MappedActivity, MarkerData, ReservationDraft } from '../../types/planner';
+import type { GeneratedPlan, MappedActivity, MarkerData, ReservationDraft, SavedPlannerPlan } from '../../types/planner';
 
-const starterPrompt =
-  'Plan a relaxed 3-day Seattle trip for two with coffee shops, waterfront walks, a museum, and one memorable dinner.';
+// const starterPrompt =
+//   'Plan a relaxed 3-day Seattle trip for two with coffee shops, waterfront walks, a museum, and one memorable dinner.';
 
 interface GeneratePlannerPageProps {
   onNavigate: (path: '/planner' | '/planner/generate' | '/planner/manual' | '/planner/reserve') => void;
   onPrepareReservationDraft: (draft: ReservationDraft) => void;
+  onSavePlan: (plan: SavedPlannerPlan) => void;
 }
 
 function buildGeneratedReservationDraft(plan: GeneratedPlan): ReservationDraft {
@@ -33,8 +34,22 @@ function buildGeneratedReservationDraft(plan: GeneratedPlan): ReservationDraft {
   };
 }
 
-const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, onPrepareReservationDraft }) => {
-  const [tripDescription, setTripDescription] = useState(starterPrompt);
+function buildSavedGeneratedPlan(plan: GeneratedPlan, prompt: string): SavedPlannerPlan {
+  return {
+    kind: 'generated',
+    id: `saved-generated-${plan.id}-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    title: plan.title,
+    subtitle: plan.summary,
+    prompt,
+    days: plan.days,
+    activityCount: plan.activities.length,
+    plan,
+  };
+}
+
+const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, onPrepareReservationDraft, onSavePlan }) => {
+  const [tripDescription, setTripDescription] = useState('');
   const [plans, setPlans] = useState<GeneratedPlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [mappedPlanId, setMappedPlanId] = useState<string | null>(null);
@@ -172,6 +187,11 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
     onNavigate('/planner/reserve');
   };
 
+  const handleSavePlan = () => {
+    if (!selectedPlan) return;
+    onSavePlan(buildSavedGeneratedPlan(selectedPlan, tripDescription.trim()));
+  };
+
   const handleSelectMappedActivity = (activityId: string) => {
     if (mappedPlanId) {
       setSelectedPlanId(mappedPlanId);
@@ -184,7 +204,7 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
         <section className="rounded-[36px] border border-sky-100 bg-white/85 p-8 shadow-[0_24px_80px_rgba(14,116,144,0.12)] backdrop-blur">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="inline-flex items-center rounded-full bg-sky-100 px-4 py-1 text-xs font-bold uppercase tracking-[0.2em] text-sky-700">
+            <div className="inline-flex items-center rounded-full bg-sky-100 px-4 py-3 text-sm font-bold uppercase tracking-[0.1em] text-sky-700">
               Generate Plan
             </div>
             <button
@@ -198,54 +218,84 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
 
           <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
             <div>
-              <h2 className="max-w-3xl text-4xl font-black tracking-tight text-slate-900">
-                Generate three polished travel plans, then send one straight to the map.
-              </h2>
+              <h3 className="max-w-3xl text-4xl font-black tracking-tight text-slate-900">
+                Generate, Select, View, Plan
+              </h3>
               <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
-                Describe the kind of trip you want and your local LLaMA model will return
-                three structured options. Pick a plan, review the itinerary by day, and map
-                its activities as numbered stops.
+                Describe the kind of trip your looking for and instantly get three thoughtfully crafted plans. 
+                Pick one, view the recommended daily itinerary, and interact with the map to explore the stops.
               </p>
             </div>
 
-            <div className="rounded-[28px] border border-sky-100 bg-sky-50/70 p-5">
+            {/* <div className="rounded-[28px] border border-sky-100 bg-sky-50/70 p-5">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">Planner flow</p>
               <div className="mt-4 space-y-3 text-sm text-slate-600">
                 <p>1. Generate 3 plan options from your prompt</p>
                 <p>2. Select the strongest itinerary</p>
                 <p>3. Send that itinerary to the map as numbered stops</p>
               </div>
-            </div>
+            </div> */}
           </div>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
             <label className="block">
-              <span className="mb-2 block text-sm font-bold uppercase tracking-[0.14em] text-slate-500">
-                Ideal Trip Description
+              <span className="mb-3 block px-2 text-sm font-bold uppercase tracking-[0.1em] text-slate-500">
+                Describe your ideal trip
               </span>
-              <textarea
-                value={tripDescription}
-                onChange={(event) => setTripDescription(event.target.value)}
-                placeholder="Example: Plan a cozy anniversary weekend in Portland with bookstores, good food, and a scenic walk."
-                className="min-h-[210px] w-full rounded-[26px] border border-slate-200 bg-white px-5 py-4 text-base leading-7 text-slate-800 shadow-inner outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-              />
+              <div className="overflow-hidden rounded-[30px] border border-slate-700 bg-[#2e2e2e] shadow-[0_22px_60px_rgba(15,23,42,0.22)] transition focus-within:border-sky-400/70 focus-within:ring-4 focus-within:ring-sky-100">
+                <textarea
+                  value={tripDescription}
+                  onChange={(event) => setTripDescription(event.target.value)}
+                  className="min-h-[210px] w-full resize-none border-0 bg-transparent px-6 py-5 text-base leading-7 text-white outline-none placeholder:italic placeholder:text-slate-400"
+                  placeholder="Example: Plan a relaxed 3-day Seattle trip for two with coffee shops, waterfront walks, a museum, and one memorable dinner."
+                />
+
+                <div className="flex items-center justify-between px-5 pb-4">
+                  <button
+                    type="button"
+                    aria-label="Add details"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full text-2xl font-light text-slate-300 transition hover:bg-white/5 hover:text-white"
+                  >
+                    +
+                  </button>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      aria-label="Voice input"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-300 transition hover:bg-white/5 hover:text-white"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
+                        <path d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.92V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.08A7 7 0 0 1 5 12a1 1 0 1 1 2 0 5 5 0 1 0 10 0Z" />
+                      </svg>
+                    </button>
+
+                    <button
+                      type="submit"
+                      aria-label={isGenerating ? 'Generating plans' : 'Generate plans'}
+                      disabled={isGenerating}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-950 shadow-lg transition hover:scale-105 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isGenerating ? (
+                        <svg viewBox="0 0 24 24" className="h-4 w-4 animate-spin fill-none stroke-current stroke-2" aria-hidden="true">
+                          <path d="M12 3a9 9 0 1 0 9 9" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
+                          <path d="M12 4a1 1 0 0 1 1 1v10.59l3.3-3.29a1 1 0 1 1 1.4 1.41l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 0 1 1.4-1.41L11 15.59V5a1 1 0 0 1 1-1Z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </label>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <button
-                type="submit"
-                disabled={isGenerating}
-                className="inline-flex items-center justify-center rounded-full bg-sky-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-sky-200 transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {isGenerating ? 'Generating 3 Plans...' : 'Generate 3 Plans'}
-              </button>
+            {/* <p className="text-sm text-slate-500">
+              Structured itinerary options come back from your local Ollama `llama3` model.
+            </p> */}
 
-              <p className="text-sm text-slate-500">
-                Structured itinerary options come back from your local Ollama `llama3` model.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-3 pt-1">
+            {/* <div className="flex flex-wrap gap-3 pt-1">
               <button
                 type="button"
                 onClick={handleReservePlan}
@@ -257,7 +307,7 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
               <p className="self-center text-sm text-slate-500">
                 Open a future booking queue for the currently selected itinerary.
               </p>
-            </div>
+            </div> */}
           </form>
 
           {error && (
@@ -270,7 +320,7 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
         <section className="rounded-[32px] border border-slate-200 bg-white/85 p-6 shadow-[0_18px_70px_rgba(15,23,42,0.08)]">
           <div className="mb-5 flex items-center justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Plan Options</p>
+              <p className="text-sm font-bold uppercase tracking-[0.1em] text-slate-500">Plan Options</p>
               <h3 className="mt-2 text-2xl font-black text-slate-900">Choose a Direction</h3>
             </div>
             <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
@@ -360,13 +410,13 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
           )}
         </section>
 
-        <div className="grid gap-8 xl:grid-cols-[minmax(0,1.2fr)_420px]">
+        <div className="grid gap-8 pb-16 xl:grid-cols-[minmax(0,1.2fr)_420px]">
           <section className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Map View</p>
+                <p className="text-md px-3 py-1 font-bold uppercase tracking-[0.08em] text-slate-700">Map View</p>
                 <h3 className="mt-2 text-2xl font-black text-slate-900">
-                  {mappedPlan ? `${mappedPlan.title} on the map` : 'Map your selected itinerary'}
+                  {mappedPlan ? `${mappedPlan.title} on the map` : ''}
                 </h3>
               </div>
               <div className="flex gap-2">
@@ -392,15 +442,15 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
             />
           </section>
 
-          <aside className="rounded-[32px] border border-slate-200 bg-slate-950 p-6 text-slate-100 shadow-[0_24px_80px_rgba(15,23,42,0.24)]">
+          <aside className="mt-14 rounded-[32px] border border-slate-200 bg-slate-950 p-6 text-slate-100 shadow-[0_24px_80px_rgba(15,23,42,0.24)]">
             <div className="mb-5 flex items-center justify-between">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-300">Selected Itinerary</p>
-                <h3 className="mt-2 text-2xl font-black">
-                  {selectedPlan ? selectedPlan.title : 'No plan selected'}
-                </h3>
+                <p className="text-sm font-bold uppercase tracking-[0.1em] text-sky-300">Selected Itinerary</p>
+                {/* <h3 className="mt-2 text-2sm font-black">
+                  {selectedPlan ? selectedPlan.title : 'no plan selected'}
+                </h3> */}
               </div>
-              <div className="rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-xs font-semibold text-sky-200">
+              <div className="mt-0 rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-xs font-semibold text-sky-200">
                 {selectedPlan ? `${selectedPlan.days} days` : 'Awaiting plan'}
               </div>
             </div>
@@ -412,6 +462,22 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
                   <div className="mt-3 flex items-center gap-3 text-xs uppercase tracking-[0.14em] text-sky-200">
                     <span>{selectedPlan.activities.length} total stops</span>
                     <span>{mappedPlanId === selectedPlan.id ? 'Currently mapped' : 'Not mapped yet'}</span>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={handleSavePlan}
+                      className="rounded-full bg-sky-500 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-white transition hover:bg-sky-400"
+                    >
+                      Save to My Plans
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleReservePlan}
+                      className="rounded-full bg-amber-500 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-white transition hover:bg-amber-400"
+                    >
+                      Reserve Plan
+                    </button>
                   </div>
                 </div>
 

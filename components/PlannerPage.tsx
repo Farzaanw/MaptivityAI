@@ -4,7 +4,7 @@ import ManualPlannerPage from './planner/ManualPlannerPage';
 import PlannerModeSelection from './planner/PlannerModeSelection';
 import type { Activity as SavedActivity } from '../types';
 import ReservePlanPage from './planner/ReservePlanPage';
-import type { ReservationDraft } from '../types/planner';
+import type { ReservationDraft, SavedPlannerPlan } from '../types/planner';
 
 interface PlannerPageProps {
   routePath: string;
@@ -12,6 +12,7 @@ interface PlannerPageProps {
   favorites: SavedActivity[];
   reservationDraft: ReservationDraft | null;
   onPrepareReservationDraft: (draft: ReservationDraft) => void;
+  onSavePlan: (plan: SavedPlannerPlan) => void;
 }
 
 const PlannerPage: React.FC<PlannerPageProps> = ({
@@ -20,12 +21,14 @@ const PlannerPage: React.FC<PlannerPageProps> = ({
   favorites,
   reservationDraft,
   onPrepareReservationDraft,
+  onSavePlan,
 }) => {
   if (routePath === '/planner/generate') {
     return (
       <GeneratePlannerPage
         onNavigate={onNavigate}
         onPrepareReservationDraft={onPrepareReservationDraft}
+        onSavePlan={onSavePlan}
       />
     );
   }
@@ -36,6 +39,7 @@ const PlannerPage: React.FC<PlannerPageProps> = ({
         onNavigate={onNavigate}
         favorites={favorites}
         onPrepareReservationDraft={onPrepareReservationDraft}
+        onSavePlan={onSavePlan}
       />
     );
   }
