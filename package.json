@@ -12,6 +12,9 @@
     "dev:all": "npm run setup && concurrently \"npm run dev\" \"cd server && npm run dev\""
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@google/genai": "^1.39.0",
     "@supabase/supabase-js": "^2.97.0",
     "html2canvas": "^1.4.1",

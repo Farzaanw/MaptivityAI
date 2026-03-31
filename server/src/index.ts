@@ -12,6 +12,8 @@ dotenv.config({ path: envPath });
 
 const PORT = 5050;
 const API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY;
+const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'llama3:latest';
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 }); // 10 min cache, check every 2 min
 
 console.log('[startup] CWD:', process.cwd());
@@ -169,6 +171,181 @@ function haversineDistanceMeters(lat1: number, lng1: number, lat2: number, lng2:
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+interface PlannerActivity {
+  name: string;
+  time: string;
+  location: string;
+  description: string;
+}
+
+interface PlannerPlan {
+  id: string;
+  title: string;
+  summary: string;
+  days: number;
+  activities: PlannerActivity[];
+}
+
+interface PlannerResponse {
+  plans: PlannerPlan[];
+}
+
+interface PlannerMarkerLookup {
+  id: string;
+  name: string;
+  locationQuery: string;
+}
+
+interface PlannerMarkerResult {
+  id: string;
+  lat: number | null;
+  lng: number | null;
+}
+
+const plannerJsonSchema = {
+  type: 'object',
+  required: ['plans'],
+  properties: {
+    plans: {
+      type: 'array',
+      minItems: 3,
+      maxItems: 3,
+      items: {
+        type: 'object',
+        required: ['id', 'title', 'summary', 'days', 'activities'],
+        properties: {
+          id: { type: 'string' },
+          title: { type: 'string' },
+          summary: { type: 'string' },
+          days: { type: 'integer', minimum: 1 },
+          activities: {
+            type: 'array',
+            minItems: 1,
+            items: {
+              type: 'object',
+              required: ['name', 'time', 'location', 'description'],
+              properties: {
+                name: { type: 'string' },
+                time: { type: 'string' },
+                location: { type: 'string' },
+                description: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+} as const;
+
+function extractJsonBlock(text: string): string {
+  const fenced = text.match(/```json\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) return fenced[1].trim();
+
+  const firstBrace = text.indexOf('{');
+  const lastBrace = text.lastIndexOf('}');
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    return text.slice(firstBrace, lastBrace + 1);
+  }
+
+  return text.trim();
+}
+
+function isPlannerActivity(value: unknown): value is PlannerActivity {
+  if (!value || typeof value !== 'object') return false;
+  const activity = value as Record<string, unknown>;
+  return typeof activity.name === 'string'
+    && typeof activity.time === 'string'
+    && typeof activity.location === 'string'
+    && typeof activity.description === 'string';
+}
+
+function isPlannerPlan(value: unknown): value is PlannerPlan {
+  if (!value || typeof value !== 'object') return false;
+  const plan = value as Record<string, unknown>;
+  return typeof plan.id === 'string'
+    && typeof plan.title === 'string'
+    && typeof plan.summary === 'string'
+    && typeof plan.days === 'number'
+    && Number.isFinite(plan.days)
+    && plan.days >= 1
+    && Array.isArray(plan.activities)
+    && plan.activities.every(isPlannerActivity);
+}
+
+function safeParsePlannerResponse(raw: string): PlannerResponse | null {
+  try {
+    const parsed = JSON.parse(extractJsonBlock(raw)) as unknown;
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+
+    const plans = (parsed as { plans?: unknown }).plans;
+    if (
+      Array.isArray(plans)
+      && plans.length === 3
+      && plans.every(isPlannerPlan)
+    ) {
+      return parsed as PlannerResponse;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function isPlannerMarkerLookup(value: unknown): value is PlannerMarkerLookup {
+  if (!value || typeof value !== 'object') return false;
+  const marker = value as Record<string, unknown>;
+  return typeof marker.id === 'string'
+    && typeof marker.name === 'string'
+    && typeof marker.locationQuery === 'string';
+}
+
+async function searchPlannerMarker(query: string): Promise<{ lat: number; lng: number } | null> {
+  if (!API_KEY) {
+    return null;
+  }
+
+  const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+    method: 'POST',
+    headers: {
+      'X-Goog-Api-Key': API_KEY,
+      'X-Goog-FieldMask': 'places.location',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      textQuery: query,
+      maxResultCount: 1,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[planner-markers] Places text search failed:', response.status, errorText);
+    return null;
+  }
+
+  const data = await response.json() as {
+    places?: Array<{
+      location?: {
+        latitude?: number;
+        longitude?: number;
+      };
+    }>;
+  };
+
+  const location = data.places?.[0]?.location;
+  if (typeof location?.latitude !== 'number' || typeof location?.longitude !== 'number') {
+    return null;
+  }
+
+  return {
+    lat: location.latitude,
+    lng: location.longitude,
+  };
+}
+
 app.use(
   cors({
     origin: (origin, cb) => {
@@ -181,6 +358,214 @@ app.use(
   })
 );
 app.use(express.json());
+
+app.post('/api/planner/itinerary', async (req, res) => {
+  const prompt = typeof req.body?.prompt === 'string' ? req.body.prompt.trim() : '';
+
+  if (!prompt) {
+    return res.status(400).json({ error: 'Trip description is required.' });
+  }
+
+  const systemPrompt = [
+    'You are a practical trip planner.',
+    'Return exactly 3 distinct travel plan options as JSON.',
+    'Do not return prose outside JSON.',
+    'Each plan must include id, title, summary, days, and activities.',
+    'Each activity must include name, time, location, and description.',
+    'Use short titles and concise summaries.',
+    'Make activity times readable, for example "Day 1 - Morning" or "Day 2 - 7:30 PM".',
+    'Keep the plans realistic and easy to skim.',
+  ].join(' ');
+
+  try {
+    const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        stream: false,
+        format: plannerJsonSchema,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt },
+        ],
+        options: {
+          temperature: 0.7,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[planner] Ollama error:', response.status, errorText);
+      return res.status(502).json({
+        error: 'Unable to reach the local LLaMA model. Make sure Ollama is running and the model is installed.',
+      });
+    }
+
+    const data = await response.json() as {
+      message?: { content?: string };
+    };
+    const rawContent = data.message?.content?.trim();
+
+    if (!rawContent) {
+      return res.status(502).json({ error: 'The local LLaMA model returned an empty itinerary.' });
+    }
+
+    const parsed = safeParsePlannerResponse(rawContent);
+    if (!parsed) {
+      console.error('[planner] Invalid planner JSON:', rawContent);
+      return res.status(502).json({
+        error: 'The local LLaMA model returned invalid planner JSON.',
+      });
+    }
+
+    res.json(parsed);
+  } catch (error) {
+    console.error('[planner] Error generating itinerary:', error);
+    res.status(500).json({
+      error: 'Unable to generate an itinerary right now. Make sure your local LLaMA server is running.',
+    });
+  }
+});
+
+app.post('/api/planner/markers', async (req, res) => {
+  const activities = req.body?.activities;
+
+  if (!Array.isArray(activities) || !activities.every(isPlannerMarkerLookup)) {
+    return res.status(400).json({ error: 'Planner marker requests must include id, name, and locationQuery.' });
+  }
+
+  try {
+    const markers = await Promise.all(
+      activities.map(async (activity): Promise<PlannerMarkerResult> => {
+        const combinedQuery = [activity.name, activity.locationQuery]
+          .map((value) => value.trim())
+          .filter(Boolean)
+          .join(', ');
+
+        const coordinates =
+          await searchPlannerMarker(combinedQuery)
+          ?? await searchPlannerMarker(activity.locationQuery.trim())
+          ?? await searchPlannerMarker(activity.name.trim());
+
+        return {
+          id: activity.id,
+          lat: coordinates?.lat ?? null,
+          lng: coordinates?.lng ?? null,
+        };
+      }),
+    );
+
+    res.json({ markers });
+  } catch (error) {
+    console.error('[planner-markers] Error resolving markers:', error);
+    res.status(500).json({ error: 'Unable to resolve planner markers right now.' });
+  }
+});
+
+app.post('/api/planner/discover', async (req, res) => {
+  const lat = Number(req.body?.lat);
+  const lng = Number(req.body?.lng);
+  const radiusMeters = Math.min(Math.max(Number(req.body?.radiusMeters) || 6000, 1000), 15000);
+
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+    return res.status(400).json({ error: 'A valid latitude is required.' });
+  }
+
+  if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+    return res.status(400).json({ error: 'A valid longitude is required.' });
+  }
+
+  if (!API_KEY) {
+    return res.status(500).json({ error: 'Google Places API key is not configured.' });
+  }
+
+  const cacheKey = `planner-discover:${lat}:${lng}:${radiusMeters}`;
+  const cachedResult = cache.get(cacheKey);
+  if (cachedResult) {
+    return res.json(cachedResult);
+  }
+
+  try {
+    const response = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
+      method: 'POST',
+      headers: {
+        'X-Goog-Api-Key': API_KEY,
+        'X-Goog-FieldMask': FIELDS,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        includedTypes: [
+          'tourist_attraction',
+          'restaurant',
+          'park',
+          'museum',
+          'night_club',
+          'bar',
+          'art_gallery',
+          'cafe',
+        ],
+        maxResultCount: 20,
+        locationRestriction: {
+          circle: {
+            center: { latitude: lat, longitude: lng },
+            radius: radiusMeters,
+          },
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[planner-discover] Places API error:', response.status, errorText);
+      return res.status(response.status).json({ error: 'Unable to retrieve planner activities.' });
+    }
+
+    const data = await response.json() as { places?: Array<Record<string, unknown>> };
+    const places = (data.places ?? [])
+      .map((place) => {
+        const id = (place.id as string) ?? '';
+        const displayName = place.displayName as { text?: string } | undefined;
+        const location = place.location as { latitude?: number; longitude?: number } | undefined;
+        const formattedAddress = (place.formattedAddress as string) ?? '';
+        const rating = place.rating as number | undefined;
+        const photos = (place.photos as { name?: string }[]) ?? [];
+        const photoName = photos[0]?.name;
+
+        if (
+          !id
+          || !displayName?.text
+          || typeof location?.latitude !== 'number'
+          || typeof location?.longitude !== 'number'
+        ) {
+          return null;
+        }
+
+        return {
+          id,
+          placeId: id,
+          name: displayName.text,
+          address: formattedAddress,
+          rating,
+          lat: location.latitude,
+          lng: location.longitude,
+          ...(photoName ? { photoUrl: `/api/places/photo/${photoName}` } : {}),
+        };
+      })
+      .filter((place): place is NonNullable<typeof place> => Boolean(place));
+
+    const deduplicatedPlaces = Array.from(new Map(places.map((place) => [place.id, place])).values());
+    const result = { activities: deduplicatedPlaces };
+    cache.set(cacheKey, result);
+    res.json(result);
+  } catch (error) {
+    console.error('[planner-discover] Error:', error);
+    res.status(500).json({ error: 'Unable to retrieve planner activities right now.' });
+  }
+});
 
 app.get('/api/places/nearby', async (req, res) => {
   const lat = parseFloat(req.query.lat as string);

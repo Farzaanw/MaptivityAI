@@ -143,11 +143,10 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, onSet
       let lng: number | null = null;
 
       // 1️⃣ Try Places API (New) - fetch location, viewport, address, and types
-      const place = await placePrediction
-        .toPlace()
-        .fetchFields({
-          fields: ["location", "viewport", "formattedAddress", "types", "photos", "displayName", "rating", "userRatingCount", "businessStatus", "editorialSummary"],
-        });
+      const place = placePrediction.toPlace();
+      await place.fetchFields({
+        fields: ["location", "viewport", "formattedAddress", "types", "photos", "displayName", "rating", "userRatingCount", "businessStatus", "editorialSummary"],
+      });
 
       if (place.location) {
         lat = place.location.lat();
@@ -163,12 +162,15 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, onSet
         const geocoder = new google.maps.Geocoder();
 
         const geocodeResult = await geocoder.geocode({
-          address: placePrediction.text.text,
+          address: place.formattedAddress || placePrediction.text.text,
         });
 
         if (geocodeResult.results[0]?.geometry?.location) {
           lat = geocodeResult.results[0].geometry.location.lat();
           lng = geocodeResult.results[0].geometry.location.lng();
+          if (!place.viewport && geocodeResult.results[0].geometry.viewport) {
+            place.viewport = geocodeResult.results[0].geometry.viewport;
+          }
         } else {
           throw new Error("Geocoding failed");
         }
