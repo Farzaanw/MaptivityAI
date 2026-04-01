@@ -41,81 +41,15 @@ const PLACE_DETAILS_FIELDS =
 
 
 const GENERIC_QUERIES = ['things to do', 'fun things to do', ''];
-const ACTIVITY_SEARCH_GROUPS = [
-  {
-    name: 'featured-activities',
-    maxResultCount: 20,
-    includedTypes: [
-      'amusement_park',
-      'aquarium',
-      'bowling_alley',
-      'casino',
-      'golf_course',
-      'movie_theater',
-      'museum',
-      'stadium',
-      'tourist_attraction',
-      'zoo',
-    ],
-  },
-  {
-    name: 'creative-and-outdoor',
-    maxResultCount: 20,
-    includedTypes: [
-      'art_gallery',
-      'beach',
-      'garden',
-      'lake',
-      'park',
-    ],
-  },
-  {
-    name: 'social-and-casual',
-    maxResultCount: 12,
-    includedTypes: [
-      'bar',
-      'cafe',
-      'ice_cream_shop',
-      'restaurant',
-      'shopping_mall',
-    ],
-  },
-] as const;
-const ACTIVITY_TYPE_WEIGHTS: Record<string, number> = {
-  amusement_park: 120,
-  aquarium: 110,
-  bowling_alley: 150,
-  golf_course: 145,
-  movie_theater: 135,
-  museum: 115,
-  stadium: 110,
-  tourist_attraction: 105,
-  zoo: 115,
-  art_gallery: 90,
-  beach: 85,
-  garden: 80,
-  lake: 80,
-  park: 75,
-  bar: 45,
-  cafe: 30,
-  ice_cream_shop: 25,
-  restaurant: 20,
-  shopping_mall: 15,
-};
-const ACTIVITY_KEYWORD_BOOSTS: Array<[string, number]> = [
-  ['bowling', 40],
-  ['strike', 15],
-  ['golf', 40],
-  ['topgolf', 60],
-  ['movie', 35],
-  ['cinema', 35],
-  ['theater', 30],
-  ['arcade', 35],
-  ['mini golf', 30],
-  ['putting', 25],
-  ['museum', 20],
-  ['aquarium', 20],
+
+const NEARBY_TYPE_BUCKETS: string[][] = [
+  ['restaurant', 'cafe', 'bar', 'bakery', 'ice_cream_shop'],
+  ['museum', 'art_gallery', 'tourist_attraction', 'zoo', 'aquarium', 'marina'],
+  ['park', 'beach', 'garden', 'lake', 'golf_course', 'hiking_area'],
+  ['movie_theater', 'stadium', 'shopping_mall', 'casino', 'bowling_alley', 'spa', 'gym'],
 ];
+
+const MAX_MERGED_RESULTS = 80;
 
 function isGenericQuery(q: string): boolean {
   const normalized = q.trim().toLowerCase();
@@ -246,63 +180,30 @@ function haversineDistanceMeters(lat1: number, lng1: number, lat2: number, lng2:
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function activityWeightForPlace(place: Record<string, unknown>): number {
-  const types = ((place.types as string[]) ?? []).map((type) => type.toLowerCase());
-  const displayName = place.displayName as { text?: string } | undefined;
-  const name = (displayName?.text ?? '').toLowerCase();
-
-  let score = types.reduce((best, type) => Math.max(best, ACTIVITY_TYPE_WEIGHTS[type] ?? 0), 0);
-
-  for (const [keyword, boost] of ACTIVITY_KEYWORD_BOOSTS) {
-    if (name.includes(keyword)) {
-      score += boost;
-    }
-  }
-
-  const rating = typeof place.rating === 'number' ? place.rating : 0;
-  const userRatingCount = typeof place.userRatingCount === 'number' ? place.userRatingCount : 0;
-  score += rating * 8;
-  score += Math.min(Math.log10(userRatingCount + 1) * 12, 30);
-
-  return score;
-}
-
-function scorePlaceForRegionSearch(
-  place: Record<string, unknown>,
-  center: { latitude: number; longitude: number }
-): number {
-  const location = place.location as { latitude?: number; longitude?: number } | undefined;
-  const distanceMeters =
-    typeof location?.latitude === 'number' && typeof location?.longitude === 'number'
-      ? haversineDistanceMeters(center.latitude, center.longitude, location.latitude, location.longitude)
-      : 0;
-
-  return activityWeightForPlace(place) - Math.min(distanceMeters / 400, 20);
-}
-
-async function searchNearbyByTypes(
-  headers: Record<string, string>,
-  circle: { center: { latitude: number; longitude: number }; radius: number },
-  includedTypes: readonly string[],
-  maxResultCount: number
-): Promise<Array<Record<string, unknown>>> {
+async function fetchNearbyPlaces(params: {
+  headers: Record<string, string>;
+  circle: { center: { latitude: number; longitude: number }; radius: number };
+  includedTypes: string[];
+}): Promise<Array<Record<string, unknown>>> {
+  const { headers, circle, includedTypes } = params;
   const response = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
     method: 'POST',
     headers,
     body: JSON.stringify({
       includedTypes,
-      maxResultCount,
+      maxResultCount: 20,
       locationRestriction: { circle },
     }),
   });
 
   if (!response.ok) {
     const err = await response.text();
+    console.error('[searchNearby] Places API error:', response.status, err);
     throw new Error(err || 'Places API error');
   }
 
   const data = (await response.json()) as { places?: Array<Record<string, unknown>> };
-  return (data.places ?? []) as Array<Record<string, unknown>>;
+  return data.places ?? [];
 }
 
 interface PlannerActivity {
@@ -788,25 +689,29 @@ app.get('/api/places/nearby', async (req, res) => {
     data.places = filtered;
   } else {
     try {
-      const groupedResults = await Promise.all(
-        ACTIVITY_SEARCH_GROUPS.map(async (group) => {
-          const places = await searchNearbyByTypes(headers, circle, group.includedTypes, group.maxResultCount);
-          console.log(`[searchNearby] ${group.name}: ${places.length} places`);
-          return places;
-        }),
+      const bucketResults = await Promise.all(
+        NEARBY_TYPE_BUCKETS.map((includedTypes) =>
+          fetchNearbyPlaces({ headers, circle, includedTypes })
+        )
       );
 
-      const mergedPlaces = groupedResults.flat();
-      const uniquePlaces = Array.from(new Map(mergedPlaces.map((place) => [place.id as string, place])).values());
-      const rankedPlaces = uniquePlaces
-        .sort((a, b) => scorePlaceForRegionSearch(b, center) - scorePlaceForRegionSearch(a, center))
-        .slice(0, 20);
+      const merged: Array<Record<string, unknown>> = [];
+      const seenIds = new Set<string>();
 
-      console.log(`[searchNearby] Merged ${mergedPlaces.length} places into ${rankedPlaces.length} ranked activities`);
-      data = { places: rankedPlaces };
+      for (const places of bucketResults) {
+        for (const place of places) {
+          const id = (place.id as string) ?? '';
+          if (!id || seenIds.has(id)) continue;
+          seenIds.add(id);
+          merged.push(place);
+          if (merged.length >= MAX_MERGED_RESULTS) break;
+        }
+        if (merged.length >= MAX_MERGED_RESULTS) break;
+      }
+
+      data = { places: merged };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Places API error';
-      console.error('[searchNearby] Places API error:', message);
       return res.status(502).json({ error: message });
     }
   }
