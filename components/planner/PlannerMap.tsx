@@ -98,6 +98,43 @@ const PlannerMap: React.FC<PlannerMapProps> = ({
   }, [googleReady]);
 
   useEffect(() => {
+    if (!googleReady || !mapRef.current || !containerRef.current) {
+      return;
+    }
+
+    const resizeMap = () => {
+      if (!mapRef.current) return;
+      google.maps.event.trigger(mapRef.current, 'resize');
+
+      if (resolvedMarkers.length > 0) {
+        const bounds = new google.maps.LatLngBounds();
+        resolvedMarkers.forEach((marker) => {
+          bounds.extend({ lat: marker.lat!, lng: marker.lng! });
+        });
+
+        if (!bounds.isEmpty()) {
+          mapRef.current.fitBounds(bounds, 80);
+          return;
+        }
+      }
+
+      mapRef.current.setCenter(defaultCenter);
+      mapRef.current.setZoom(4);
+    };
+
+    const observer = new ResizeObserver(() => {
+      resizeMap();
+    });
+
+    observer.observe(containerRef.current);
+    window.setTimeout(resizeMap, 0);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [googleReady, resolvedMarkers]);
+
+  useEffect(() => {
     if (!mapRef.current || !infoWindowRef.current) {
       return;
     }
@@ -193,7 +230,7 @@ const PlannerMap: React.FC<PlannerMapProps> = ({
 
   return (
     <div className="relative h-full min-h-[460px] overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_18px_70px_rgba(15,23,42,0.08)]">
-      <div ref={containerRef} className="h-full w-full" />
+      <div ref={containerRef} className="absolute inset-0" />
 
       {!googleReady && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-50 text-sm font-medium text-slate-500">

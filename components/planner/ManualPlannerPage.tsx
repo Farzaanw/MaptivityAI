@@ -16,8 +16,9 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import PlannerMap from './PlannerMap';
 import { discoverPlannerActivities } from '../../services/manualPlannerService';
-import type { Activity, Plan, PlannerLocation, ReservationDraft, SavedPlannerPlan } from '../../types/planner';
+import type { Activity, MarkerData, Plan, PlannerLocation, ReservationDraft, SavedPlannerPlan } from '../../types/planner';
 import type { Activity as SavedActivity } from '../../types';
 
 interface ManualPlannerPageProps {
@@ -421,6 +422,32 @@ function buildSavedManualPlan(plan: Plan, destination: PlannerLocation | null): 
   };
 }
 
+function buildManualPlanMarkers(plan: Plan): MarkerData[] {
+  let stopOrder = 0;
+
+  return plan.days.flatMap((day) =>
+    day.activities.map((activity, index) => {
+      stopOrder += 1;
+
+      return {
+        id: activity.id,
+        order: stopOrder,
+        dayNumber: day.day,
+        name: activity.name,
+        time: `Day ${day.day} • Stop ${index + 1}`,
+        location: activity.address,
+        description: activity.address,
+        planId: plan.id,
+        markerLabel: String(stopOrder),
+        locationQuery: activity.address,
+        lat: activity.lat,
+        lng: activity.lng,
+        geocodeStatus: 'resolved' as const,
+      };
+    }),
+  );
+}
+
 const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
   onNavigate,
   favorites,
@@ -440,6 +467,9 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
   });
   const [activeDay, setActiveDay] = useState(1);
   const [activeDrag, setActiveDrag] = useState<DragPreviewData | null>(null);
+  const [mappedMarkers, setMappedMarkers] = useState<MarkerData[]>([]);
+  const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
+  const [hoveredActivityId, setHoveredActivityId] = useState<string | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -459,6 +489,10 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
   );
 
   const activityDiscoveryItems = showFavoritesOnly ? favoriteActivities : discoveredActivities;
+  const selectedMappedActivity = useMemo(
+    () => mappedMarkers.find((marker) => marker.id === selectedActivityId) ?? null,
+    [mappedMarkers, selectedActivityId],
+  );
 
   const loadActivities = async (location: PlannerLocation) => {
     setIsLoadingActivities(true);
@@ -486,6 +520,9 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
       days: [{ day: 1, activities: [] }],
     });
     setActiveDay(1);
+    setMappedMarkers([]);
+    setSelectedActivityId(null);
+    setHoveredActivityId(null);
     void loadActivities(location);
   };
 
@@ -639,6 +676,15 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
   const handleSavePlan = () => {
     if (plannedCount === 0) return;
     onSavePlan(buildSavedManualPlan(plan, selectedLocation));
+  };
+
+  const handleSendToMap = () => {
+    if (plannedCount === 0) return;
+
+    const markers = buildManualPlanMarkers(plan);
+    setMappedMarkers(markers);
+    setSelectedActivityId(markers[0]?.id ?? null);
+    setHoveredActivityId(null);
   };
 
   return (
@@ -810,8 +856,8 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
           onDragCancel={() => setActiveDrag(null)}
           onDragEnd={handleDragEnd}
         >
-          <div className="grid gap-8 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-            <section className="rounded-[32px] border border-slate-200 bg-white/85 p-6 shadow-[0_18px_70px_rgba(15,23,42,0.08)]">
+          <div className="grid items-stretch gap-8 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+            <section className="flex min-h-0 flex-col rounded-[32px] border border-slate-200 bg-white/85 p-6 shadow-[0_18px_70px_rgba(15,23,42,0.08)] xl:h-[820px]">
               <div className="mb-5">
                 <p className="text-sm font-bold uppercase tracking-[0.1em] text-slate-500">Activity Discovery</p>
                 <div className="mt-5 inline-flex rounded-full border border-slate-200 bg-slate-100 p-1">
@@ -855,39 +901,41 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                 </div>
               </div>
 
-              {isLoadingActivities && !showFavoritesOnly ? (
-                <div className="space-y-4">
-                  {[0, 1, 2].map((item) => (
-                    <div key={item} className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                      <div className="h-5 w-40 animate-pulse rounded-full bg-slate-200" />
-                      <div className="mt-3 h-4 w-5/6 animate-pulse rounded-full bg-slate-200" />
-                      <div className="mt-2 h-4 w-2/3 animate-pulse rounded-full bg-slate-200" />
-                    </div>
-                  ))}
-                </div>
-              ) : activityDiscoveryItems.length > 0 ? (
-                <div className="grid max-h-[820px] gap-4 overflow-y-auto pr-1">
-                  {activityDiscoveryItems.map((activity) => (
-                    <div key={activity.id} className="relative">
-                      <DiscoveryCard activity={activity} />
-                      {plannedActivityIds.has(activity.id) && (
-                        <div className="pointer-events-none absolute right-4 top-4 rounded-full bg-slate-900 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-white">
-                          In plan
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-16 text-center text-sm leading-7 text-slate-500">
-                  {showFavoritesOnly
-                    ? 'No favorites saved from the map'
-                    : 'Select a location to load the most popular nearby places'}
-                </div>
-              )}
+              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                {isLoadingActivities && !showFavoritesOnly ? (
+                  <div className="space-y-4">
+                    {[0, 1, 2].map((item) => (
+                      <div key={item} className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                        <div className="h-5 w-40 animate-pulse rounded-full bg-slate-200" />
+                        <div className="mt-3 h-4 w-5/6 animate-pulse rounded-full bg-slate-200" />
+                        <div className="mt-2 h-4 w-2/3 animate-pulse rounded-full bg-slate-200" />
+                      </div>
+                    ))}
+                  </div>
+                ) : activityDiscoveryItems.length > 0 ? (
+                  <div className="grid gap-4">
+                    {activityDiscoveryItems.map((activity) => (
+                      <div key={activity.id} className="relative">
+                        <DiscoveryCard activity={activity} />
+                        {plannedActivityIds.has(activity.id) && (
+                          <div className="pointer-events-none absolute right-4 top-4 rounded-full bg-slate-900 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-white">
+                            In plan
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-16 text-center text-sm leading-7 text-slate-500">
+                    {showFavoritesOnly
+                      ? 'No favorites saved from the map'
+                      : 'Select a location to load the most popular nearby places'}
+                  </div>
+                )}
+              </div>
             </section>
 
-            <section className="rounded-[32px] border border-slate-200 bg-slate-950 p-6 text-slate-100 shadow-[0_24px_80px_rgba(15,23,42,0.24)]">
+            <section className="flex min-h-0 flex-col rounded-[32px] border border-slate-200 bg-slate-950 p-6 text-slate-100 shadow-[0_24px_80px_rgba(15,23,42,0.24)] xl:h-[820px]">
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">Planning Canvas</p>
@@ -897,6 +945,14 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                   <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200">
                     {plannedCount} selected
                   </span>
+                  <button
+                    type="button"
+                    onClick={handleSendToMap}
+                    disabled={plannedCount === 0}
+                    className="rounded-full bg-sky-500 px-4 py-2 text-sm font-black text-white transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {mappedMarkers.length > 0 ? 'Update Map' : 'Send to Map'}
+                  </button>
                   <button
                     type="button"
                     onClick={handleSavePlan}
@@ -932,80 +988,122 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                 ))}
               </div>
 
-              <div className="space-y-5">
-                {plan.days.map((day) => (
-                  <div key={day.day} className={activeDay === day.day ? 'block' : 'hidden'}>
-                    <DayDropZone day={day.day} isActive={activeDay === day.day}>
-                      <div className="mb-4 flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                            Day {day.day}
-                          </p>
-                          <h4 className="mt-2 text-xl font-black text-slate-950">
-                            {day.activities.length > 0 ? 'Drag to reorder your stops' : 'Drop activities here'}
-                          </h4>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                            {day.activities.length} stop{day.activities.length === 1 ? '' : 's'}
-                          </span>
-                          {plan.days.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveDay(day.day)}
-                              className="rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-600 transition hover:bg-rose-100"
-                            >
-                              Remove Day
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {day.activities.length > 0 ? (
-                        <SortableContext
-                          items={day.activities.map((activity) => plannedItemId(day.day, activity.id))}
-                          strategy={rectSortingStrategy}
-                        >
-                          <div className="space-y-4">
-                            {day.activities.map((activity, index) => (
-                              <React.Fragment key={activity.id}>
-                                <PlannedActivityCard
-                                  day={day.day}
-                                  activity={activity}
-                                  onRemove={() => handleRemoveActivity(day.day, activity.id)}
-                                />
-                                {index < day.activities.length - 1 && (
-                                  <div className="flex justify-center">
-                                    <div className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-100 px-3 py-2 text-slate-500 shadow-sm">
-                                      <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
-                                        <path d="M12 4a1 1 0 0 1 1 1v10.59l3.3-3.29a1 1 0 1 1 1.4 1.41l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 0 1 1.4-1.41L11 15.59V5a1 1 0 0 1 1-1Z" />
-                                      </svg>
-                                    </div>
-                                  </div>
-                                )}
-                              </React.Fragment>
-                            ))}
+              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                <div className="space-y-5">
+                  {plan.days.map((day) => (
+                    <div key={day.day} className={activeDay === day.day ? 'block' : 'hidden'}>
+                      <DayDropZone day={day.day} isActive={activeDay === day.day}>
+                        <div className="mb-4 flex items-center justify-between">
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                              Day {day.day}
+                            </p>
+                            <h4 className="mt-2 text-xl font-black text-slate-950">
+                              {day.activities.length > 0 ? 'Drag to reorder your stops' : 'Drop activities here'}
+                            </h4>
                           </div>
-                        </SortableContext>
-                      ) : (
-                        <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-14 text-center text-sm leading-7 text-slate-500">
-                          Pull activities from the discovery panel and drop them here to build Day {day.day}.
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                              {day.activities.length} stop{day.activities.length === 1 ? '' : 's'}
+                            </span>
+                            {plan.days.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveDay(day.day)}
+                                className="rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-600 transition hover:bg-rose-100"
+                              >
+                                Remove Day
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      )}
-                    </DayDropZone>
-                  </div>
-                ))}
+
+                        {day.activities.length > 0 ? (
+                          <SortableContext
+                            items={day.activities.map((activity) => plannedItemId(day.day, activity.id))}
+                            strategy={rectSortingStrategy}
+                          >
+                            <div className="space-y-4">
+                              {day.activities.map((activity, index) => (
+                                <React.Fragment key={activity.id}>
+                                  <PlannedActivityCard
+                                    day={day.day}
+                                    activity={activity}
+                                    onRemove={() => handleRemoveActivity(day.day, activity.id)}
+                                  />
+                                  {index < day.activities.length - 1 && (
+                                    <div className="flex justify-center">
+                                      <div className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-100 px-3 py-2 text-slate-500 shadow-sm">
+                                        <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
+                                          <path d="M12 4a1 1 0 0 1 1 1v10.59l3.3-3.29a1 1 0 1 1 1.4 1.41l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 0 1 1.4-1.41L11 15.59V5a1 1 0 0 1 1-1Z" />
+                                        </svg>
+                                      </div>
+                                    </div>
+                                  )}
+                                </React.Fragment>
+                              ))}
+                            </div>
+                          </SortableContext>
+                        ) : (
+                          <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-14 text-center text-sm leading-7 text-slate-500">
+                            Pull activities from the discovery panel and drop them here to build Day {day.day}.
+                          </div>
+                        )}
+                      </DayDropZone>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 rounded-[24px] border border-white/10 bg-white/5 p-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-300">Map-ready structure</p>
+                  <p className="mt-3 text-sm leading-7 text-slate-300">
+                    Every selected activity keeps its Google Places `lat` and `lng`, so this itinerary
+                    can be passed into map markers without reshaping the data later.
+                  </p>
+                </div>
               </div>
 
-              <div className="mt-6 rounded-[24px] border border-white/10 bg-white/5 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-300">Map-ready structure</p>
-                <p className="mt-3 text-sm leading-7 text-slate-300">
-                  Every selected activity keeps its Google Places `lat` and `lng`, so this itinerary
-                  can be passed into map markers without reshaping the data later.
-                </p>
-              </div>
             </section>
           </div>
+
+          <section className="rounded-[32px] border border-slate-200 bg-slate-950 p-6 text-slate-100 shadow-[0_24px_80px_rgba(15,23,42,0.24)]">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-300">Plan Map</p>
+                <h4 className="mt-2 text-2xl font-black text-white">
+                  {mappedMarkers.length > 0 ? 'Your custom plan on the map' : 'Map preview'}
+                </h4>
+              </div>
+              <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200">
+                {mappedMarkers.length} mapped
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <PlannerMap
+                markers={mappedMarkers}
+                hoveredActivityId={hoveredActivityId}
+                selectedActivityId={selectedActivityId}
+                onMarkerHoverChange={setHoveredActivityId}
+                onMarkerClick={setSelectedActivityId}
+              />
+            </div>
+
+            {selectedMappedActivity && (
+              <div className="mt-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-200">
+                  Selected Stop
+                </p>
+                <div className="mt-3 space-y-2">
+                  <p className="text-base font-bold text-white">
+                    {selectedMappedActivity.dayNumber}.{selectedMappedActivity.order} {selectedMappedActivity.name}
+                  </p>
+                  <p className="text-sm text-emerald-50">{selectedMappedActivity.time}</p>
+                  <p className="text-sm text-emerald-50">{selectedMappedActivity.location}</p>
+                </div>
+              </div>
+            )}
+          </section>
 
           <DragOverlay>
             {activeDrag ? (
