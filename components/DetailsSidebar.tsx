@@ -234,12 +234,21 @@ const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFa
                                         What people say
                                     </h3>
                                     <div className="space-y-6">
-                                        {details.reviews.map((rev, i) => (
+                                        {details.reviews.map((rev, i) => {
+                                            const reviewText = rev.text?.text ?? '';
+                                            const authorName = rev.authorAttribution?.displayName ?? 'Anonymous';
+                                            const authorPhoto = rev.authorAttribution?.photoUri;
+
+                                            return (
                                             <div key={i} className="border-b border-gray-100 pb-6 last:border-0 last:pb-0">
                                                 <div className="flex items-center gap-3 mb-2">
-                                                    <img src={rev.authorAttribution.photoUri} alt="" className="w-8 h-8 rounded-full bg-gray-100" />
+                                                    {authorPhoto ? (
+                                                        <img src={authorPhoto} alt="" className="w-8 h-8 rounded-full bg-gray-100" />
+                                                    ) : (
+                                                        <div className="w-8 h-8 rounded-full bg-gray-200" aria-hidden="true" />
+                                                    )}
                                                     <div>
-                                                        <p className="text-xs font-bold text-gray-900">{rev.authorAttribution.displayName}</p>
+                                                        <p className="text-xs font-bold text-gray-900">{authorName}</p>
                                                         <p className="text-[10px] text-gray-400">{rev.relativePublishTimeDescription}</p>
                                                     </div>
                                                     <div className="ml-auto flex gap-0.5">
@@ -250,9 +259,14 @@ const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFa
                                                         ))}
                                                     </div>
                                                 </div>
-                                                <p className="text-xs text-gray-600 leading-relaxed italic line-clamp-3">"{rev.text.text}"</p>
+                                                {reviewText ? (
+                                                    <p className="text-xs text-gray-600 leading-relaxed italic line-clamp-3">"{reviewText}"</p>
+                                                ) : (
+                                                    <p className="text-xs text-gray-400 italic">No review text provided.</p>
+                                                )}
                                             </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
 
                                     {details.googleMapsUri && (
