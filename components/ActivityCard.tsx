@@ -2,6 +2,11 @@
 import React from 'react';
 import { Activity } from '../types';
 
+interface FavoriteAlbumOption {
+  id: string;
+  title: string;
+}
+
 interface ActivityCardProps {
   activity: Activity;
   onViewDetails: (activity: Activity) => void;
@@ -11,6 +16,10 @@ interface ActivityCardProps {
   isHovered?: boolean;
   onHoverChange?: (activityId: string | null) => void;
   onToggleMark?: (activity: Activity) => void;
+  className?: string;
+  enableFavoriteAlbumPicker?: boolean;
+  favoriteAlbums?: FavoriteAlbumOption[];
+  onFavoriteSelection?: (activity: Activity, albumId: string | null) => void;
 }
 
 
@@ -22,17 +31,57 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
   isMarked,
   isHovered,
   onHoverChange,
-  onToggleMark
+  onToggleMark,
+  className,
+  enableFavoriteAlbumPicker,
+  favoriteAlbums = [],
+  onFavoriteSelection
 }) => {
 
   const [isPumping, setIsPumping] = React.useState(false);
+  const [isFavoriteMenuOpen, setIsFavoriteMenuOpen] = React.useState(false);
+  const favoriteMenuRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    if (!isFavoriteMenuOpen) return;
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (favoriteMenuRef.current && !favoriteMenuRef.current.contains(event.target as Node)) {
+        setIsFavoriteMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [isFavoriteMenuOpen]);
+
+  const triggerPump = () => {
+    setIsPumping(true);
+    setTimeout(() => setIsPumping(false), 300);
+  };
+
+  const handleFavoriteSelection = (albumId: string | null) => {
+    if (!onFavoriteSelection) return;
+    onFavoriteSelection(activity, albumId);
+    setIsFavoriteMenuOpen(false);
+    triggerPump();
+  };
 
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // Don't trigger the card's onClick (details view)
+
+    if (isFavorite && onToggleFavorite) {
+      onToggleFavorite(activity);
+      triggerPump();
+      return;
+    }
+
+    if (enableFavoriteAlbumPicker && onFavoriteSelection) {
+      setIsFavoriteMenuOpen((current) => !current);
+      return;
+    }
+
     if (onToggleFavorite) {
       onToggleFavorite(activity);
-      setIsPumping(true);
-      setTimeout(() => setIsPumping(false), 300);
+      triggerPump();
     }
   };
 
@@ -54,7 +103,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
       className={`group relative block rounded-2xl p-4 shadow-sm transition-all border-indigo-50 cursor-pointer active:scale-95 ${isHovered
         ? 'bg-indigo-50 border-indigo-300 shadow-md ring-2 ring-sky-200'
         : 'bg-white border border-gray-100 hover:bg-indigo-50/30 hover:shadow-md'
-        }`}
+        } ${className ?? ''}`}
     >
       {/* Favorite Button */}
       <button
@@ -78,6 +127,37 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
           />
         </svg>
       </button>
+
+      {isFavoriteMenuOpen && (
+        <div
+          ref={favoriteMenuRef}
+          className="absolute top-12 right-3 z-20 w-52 rounded-xl border border-gray-100 bg-white shadow-lg overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => handleFavoriteSelection(null)}
+            className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Just favorite
+          </button>
+          {favoriteAlbums.length > 0 ? (
+            favoriteAlbums.map((album) => (
+              <button
+                key={album.id}
+                type="button"
+                onClick={() => handleFavoriteSelection(album.id)}
+                className="w-full text-left px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 truncate"
+                title={album.title}
+              >
+                Add to: {album.title}
+              </button>
+            ))
+          ) : (
+            <p className="px-3 py-2 text-[11px] text-slate-400">No albums available</p>
+          )}
+        </div>
+      )}
 
       <div className="flex gap-4 mb-3">
 

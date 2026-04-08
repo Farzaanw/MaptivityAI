@@ -42,6 +42,14 @@ const getPathForPage = (page: AppPage): string => {
 };
 
 const MY_PLANS_STORAGE_KEY = 'maptivityMyPlans';
+const FAVORITE_ALBUMS_STORAGE_KEY = 'maptivityFavoriteAlbums';
+
+interface FavoriteAlbumRecord {
+  id: string;
+  title: string;
+  activityIds: string[];
+  coverPhotoUrl?: string;
+}
 
 const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371000; // Earth's radius in meters
@@ -124,6 +132,16 @@ const App: React.FC = () => {
       return [];
     }
   });
+  const [favoriteAlbums, setFavoriteAlbums] = useState<FavoriteAlbumRecord[]>(() => {
+    try {
+      const raw = localStorage.getItem(FAVORITE_ALBUMS_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as FavoriteAlbumRecord[];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
   const activePage = getPageFromPath(currentPath);
   const plannerRoute: PlannerRoute =
     currentPath === '/planner/generate' || currentPath === '/planner/manual' || currentPath === '/planner/reserve'
@@ -145,6 +163,20 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem(MY_PLANS_STORAGE_KEY, JSON.stringify(savedPlans));
   }, [savedPlans]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(FAVORITE_ALBUMS_STORAGE_KEY);
+      if (!raw) {
+        setFavoriteAlbums([]);
+        return;
+      }
+      const parsed = JSON.parse(raw) as FavoriteAlbumRecord[];
+      setFavoriteAlbums(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setFavoriteAlbums([]);
+    }
+  }, [currentPath]);
 
   const handleSavePlan = useCallback((plan: SavedPlannerPlan) => {
     setSavedPlans((current) => [plan, ...current]);
@@ -428,6 +460,34 @@ const App: React.FC = () => {
     });
   }, []);
 
+  const handleFavoriteSelection = useCallback((activity: Activity, albumId: string | null) => {
+    setFavorites((prev) => {
+      const isAlreadyFav = prev.some((f) => f.id === activity.id);
+      if (isAlreadyFav) return prev;
+      return [...prev, activity];
+    });
+
+    if (albumId) {
+      setFavoriteAlbums((current) => {
+        const updated = current.map((album) => {
+          if (album.id !== albumId) return album;
+          if (album.activityIds.includes(activity.id)) return album;
+          return {
+            ...album,
+            activityIds: [...album.activityIds, activity.id],
+            coverPhotoUrl: album.coverPhotoUrl || activity.photoUrl,
+          };
+        });
+        localStorage.setItem(FAVORITE_ALBUMS_STORAGE_KEY, JSON.stringify(updated));
+        return updated;
+      });
+      setToast({ message: 'Saved to Favorites and album', visible: true });
+      return;
+    }
+
+    setToast({ message: 'Saved to Favorites', visible: true });
+  }, []);
+
   const toggleMarkedActivity = useCallback((activity: Activity) => {
     setMarkedActivities((prev) => {
       const isMarked = prev.some((a) => a.id === activity.id);
@@ -681,6 +741,8 @@ const App: React.FC = () => {
                 onViewDetails={setSelectedActivity}
                 favorites={favorites}
                 onToggleFavorite={toggleFavorite}
+                onFavoriteSelection={handleFavoriteSelection}
+                favoriteAlbums={favoriteAlbums.map((album) => ({ id: album.id, title: album.title }))}
                 markedActivityIds={markedActivities.map(a => a.id)}
                 hoveredActivityId={hoveredActivityId}
                 onActivityHoverChange={setHoveredActivityId}
@@ -694,18 +756,6 @@ const App: React.FC = () => {
                 isResizing={isResizing}
                 setIsResizing={setIsResizing}
               />
-
-
-
-              {selectedActivity && (
-                <DetailsSidebar
-                  activity={selectedActivity}
-                  onClose={() => setSelectedActivity(null)}
-                  isFavorite={favorites.some(f => f.id === selectedActivity.id)}
-                  onToggleFavorite={toggleFavorite}
-                  width={sidebarWidth}
-                />
-              )}
 
 
 
@@ -825,6 +875,17 @@ const App: React.FC = () => {
               favorites={favorites}
               onToggleFavorite={toggleFavorite}
               onViewDetails={setSelectedActivity}
+            />
+          )}
+
+          {selectedActivity && (activePage === 'map' || activePage === 'favorites') && (
+            <DetailsSidebar
+              activity={selectedActivity}
+              onClose={() => setSelectedActivity(null)}
+              isFavorite={favorites.some(f => f.id === selectedActivity.id)}
+              onToggleFavorite={toggleFavorite}
+              width={sidebarWidth}
+              side={activePage === 'favorites' ? 'left' : 'right'}
             />
           )}
 

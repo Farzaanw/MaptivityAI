@@ -8,9 +8,10 @@ interface DetailsSidebarProps {
     isFavorite?: boolean;
     onToggleFavorite?: (activity: Activity) => void;
     width: number;
+    side?: 'left' | 'right';
 }
 
-const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFavorite, onToggleFavorite, width }) => {
+const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFavorite, onToggleFavorite, width, side = 'right' }) => {
     const [details, setDetails] = useState<PlaceDetails | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -69,7 +70,10 @@ const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFa
 
     return (
         <div
-            className="absolute inset-y-0 right-0 bg-white shadow-2xl z-[60] flex flex-col animate-in slide-in-from-right duration-300 border-l border-gray-100"
+            className={`absolute inset-y-0 bg-white shadow-2xl z-[60] flex flex-col animate-in duration-300 border-gray-100 ${side === 'left'
+                ? 'left-0 slide-in-from-left border-r'
+                : 'right-0 slide-in-from-right border-l'
+                }`}
             style={{ width: `${width}px` }}
         >
             {/* Header */}

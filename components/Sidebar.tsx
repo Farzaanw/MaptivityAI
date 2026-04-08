@@ -14,6 +14,8 @@ interface SidebarProps {
   onViewDetails: (activity: Activity) => void;
   favorites: Activity[];
   onToggleFavorite: (activity: Activity) => void;
+  onFavoriteSelection?: (activity: Activity, albumId: string | null) => void;
+  favoriteAlbums?: { id: string; title: string }[];
   markedActivityIds: string[];
   hoveredActivityId: string | null;
   onActivityHoverChange: (activityId: string | null) => void;
@@ -39,6 +41,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   onViewDetails,
   favorites,
   onToggleFavorite,
+  onFavoriteSelection,
+  favoriteAlbums,
   markedActivityIds,
   hoveredActivityId,
   onActivityHoverChange,
@@ -182,6 +186,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                       onViewDetails={onViewDetails}
                       isFavorite={favorites.some(f => f.id === activity.id)}
                       onToggleFavorite={onToggleFavorite}
+                      onFavoriteSelection={onFavoriteSelection}
+                      favoriteAlbums={favoriteAlbums}
+                      enableFavoriteAlbumPicker={true}
                       isMarked={markedActivityIds.includes(activity.id)}
                       isHovered={hoveredActivityId === activity.id}
                       onHoverChange={onActivityHoverChange}

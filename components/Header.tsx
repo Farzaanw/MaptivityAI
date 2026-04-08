@@ -28,12 +28,32 @@ function getInitials(name: string): string {
 interface ProfileSidebarProps {
   user: User;
   onClose: () => void;
+  onProfileAppearanceChange?: (appearance: { selectedAvatar: string; uploadedPhoto: string | null }) => void;
 }
 
-const ProfileSidebar: React.FC<ProfileSidebarProps> = ({ user, onClose }) => {
+const ProfileSidebar: React.FC<ProfileSidebarProps> = ({ user, onClose, onProfileAppearanceChange }) => {
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const [selectedAvatar, setSelectedAvatar] = useState<string>('a');
-  const [uploadedPhoto, setUploadedPhoto] = useState<string | null>(null);
+  const profileStorageKey = `maptivity-profile-appearance:${user.id}`;
+  const [selectedAvatar, setSelectedAvatar] = useState<string>(() => {
+    try {
+      const raw = localStorage.getItem(profileStorageKey);
+      if (!raw) return 'a';
+      const parsed = JSON.parse(raw) as { selectedAvatar?: string };
+      return parsed.selectedAvatar ?? 'a';
+    } catch {
+      return 'a';
+    }
+  });
+  const [uploadedPhoto, setUploadedPhoto] = useState<string | null>(() => {
+    try {
+      const raw = localStorage.getItem(profileStorageKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { uploadedPhoto?: string | null };
+      return parsed.uploadedPhoto ?? null;
+    } catch {
+      return null;
+    }
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fullName: string = user.user_metadata?.full_name || 'No name set';
@@ -58,6 +78,12 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({ user, onClose }) => {
     reader.onload = (ev) => setUploadedPhoto(ev.target?.result as string);
     reader.readAsDataURL(file);
   };
+
+  useEffect(() => {
+    const appearance = { selectedAvatar, uploadedPhoto };
+    localStorage.setItem(profileStorageKey, JSON.stringify(appearance));
+    onProfileAppearanceChange?.(appearance);
+  }, [onProfileAppearanceChange, profileStorageKey, selectedAvatar, uploadedPhoto]);
 
   const currentAvatarColor = DEFAULT_AVATARS.find((a) => a.id === selectedAvatar)?.color ?? '#6366f1';
 
@@ -282,17 +308,42 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ activePage, onNavigate }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [profileAppearance, setProfileAppearance] = useState<{ selectedAvatar: string; uploadedPhoto: string | null }>({ selectedAvatar: 'a', uploadedPhoto: null });
+
+  const loadProfileAppearance = useCallback((currentUser: User | null) => {
+    if (!currentUser) {
+      setProfileAppearance({ selectedAvatar: 'a', uploadedPhoto: null });
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(`maptivity-profile-appearance:${currentUser.id}`);
+      if (!raw) {
+        setProfileAppearance({ selectedAvatar: 'a', uploadedPhoto: null });
+        return;
+      }
+      const parsed = JSON.parse(raw) as { selectedAvatar?: string; uploadedPhoto?: string | null };
+      setProfileAppearance({ selectedAvatar: parsed.selectedAvatar ?? 'a', uploadedPhoto: parsed.uploadedPhoto ?? null });
+    } catch {
+      setProfileAppearance({ selectedAvatar: 'a', uploadedPhoto: null });
+    }
+  }, []);
 
   useEffect(() => {
-    getSession().then((session) => setUser(session?.user ?? null));
+    getSession().then((session) => {
+      const sessionUser = session?.user ?? null;
+      setUser(sessionUser);
+      loadProfileAppearance(sessionUser);
+    });
 
     const { data: { subscription } } = onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const sessionUser = session?.user ?? null;
+      setUser(sessionUser);
+      loadProfileAppearance(sessionUser);
       if (!session) setIsProfileOpen(false);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [loadProfileAppearance]);
 
   const toggleProfile = useCallback(() => setIsProfileOpen((prev) => !prev), []);
 
@@ -353,9 +404,17 @@ const Header: React.FC<HeaderProps> = ({ activePage, onNavigate }) => {
               className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${isProfileOpen ? 'bg-indigo-200 text-indigo-800' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'}`}
               aria-label="Open profile"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-              </svg>
+              {profileAppearance.uploadedPhoto ? (
+                <img
+                  src={profileAppearance.uploadedPhoto}
+                  alt="Profile"
+                  className="w-10 h-10 rounded-full object-cover"
+                />
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                </svg>
+              )}
             </button>
           ) : (
             <button
@@ -373,6 +432,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, onNavigate }) => {
         <ProfileSidebar
           user={user}
           onClose={() => setIsProfileOpen(false)}
+          onProfileAppearanceChange={setProfileAppearance}
         />
       )}
     </>
