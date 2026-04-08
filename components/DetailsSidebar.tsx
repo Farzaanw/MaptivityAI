@@ -65,6 +65,8 @@ const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFa
         );
     };
 
+    const reviewsLink = details?.googleMapsLinks?.reviewsUri || details?.googleMapsUri;
+
     return (
         <div
             className="absolute inset-y-0 right-0 bg-white shadow-2xl z-[60] flex flex-col animate-in slide-in-from-right duration-300 border-l border-gray-100"
@@ -154,7 +156,19 @@ const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFa
 
                             <div className="flex items-center gap-4 mb-6">
                                 {renderStars(details.rating)}
-                                <span className="text-xs text-gray-400 font-medium">({details.userRatingCount} reviews)</span>
+                                {reviewsLink ? (
+                                    <a
+                                        href={reviewsLink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-indigo-600 font-semibold hover:underline"
+                                        title="Open full Google reviews"
+                                    >
+                                        ({details.userRatingCount} reviews)
+                                    </a>
+                                ) : (
+                                    <span className="text-xs text-gray-400 font-medium">({details.userRatingCount} reviews)</span>
+                                )}
                                 {details.priceLevel && (
                                     <span className="text-sm font-bold text-green-600">
                                         {details.priceLevel === 'PRICE_LEVEL_INEXPENSIVE' ? '$' :
@@ -269,10 +283,10 @@ const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFa
                                         })}
                                     </div>
 
-                                    {details.googleMapsUri && (
+                                    {reviewsLink && (
                                         <div className="mt-6 pt-4 border-t border-gray-100">
                                             <a
-                                                href={details.googleMapsUri}
+                                                href={reviewsLink}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 group/more"

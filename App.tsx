@@ -195,6 +195,15 @@ const App: React.FC = () => {
   const hasSearchArea = circle !== null;
 
   useEffect(() => {
+    if (!circle) return;
+    setFilters((prev) => {
+      const clampedDistance = Math.min(prev.distance, circle.radiusMeters);
+      if (clampedDistance === prev.distance) return prev;
+      return { ...prev, distance: clampedDistance };
+    });
+  }, [circle]);
+
+  useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -308,6 +317,10 @@ const App: React.FC = () => {
 
   const handleRadiusChange = useCallback((radiusMeters: number) => {
     setSearchRadius(radiusMeters);
+    setFilters((prev) => ({
+      ...prev,
+      distance: Math.min(prev.distance, radiusMeters),
+    }));
   }, []);
 
   const handleSetSearchAreaClick = useCallback(async () => {
@@ -486,15 +499,31 @@ const App: React.FC = () => {
 
   const filteredActivities = React.useMemo(() => {
     return activities.filter(activity => {
+      const currentRegionRadius = circle?.radiusMeters;
+
+      // Always keep results strictly inside the current search region.
+      if (circle) {
+        const regionDist = haversineDistance(
+          circle.center.lat,
+          circle.center.lng,
+          activity.lat,
+          activity.lng
+        );
+        if (regionDist > circle.radiusMeters) return false;
+      }
+
       // 1. Distance filter (only if enabled)
       if (filters.isDistanceLimitEnabled && startTickerLocation) {
+        const maxDistanceFromStart = currentRegionRadius
+          ? Math.min(filters.distance, currentRegionRadius)
+          : filters.distance;
         const dist = haversineDistance(
           startTickerLocation.lat,
           startTickerLocation.lng,
           activity.lat,
           activity.lng
         );
-        if (dist > filters.distance) return false;
+        if (dist > maxDistanceFromStart) return false;
       }
 
       // 2. Rating filter
@@ -590,7 +619,7 @@ const App: React.FC = () => {
 
       return result;
     });
-  }, [activities, filters, startTickerLocation]);
+  }, [activities, circle, filters, startTickerLocation]);
 
   return (
     <div className="relative h-screen w-full flex flex-col overflow-hidden font-sans">

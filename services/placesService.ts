@@ -30,10 +30,37 @@ interface NearbyResponse {
   places: PlaceResponse[];
 }
 
+const STRICT_FOOD_TYPES = new Set([
+  'restaurant',
+  'bar',
+  'cafe',
+  'bakery',
+  'ice_cream_shop',
+  'meal_delivery',
+  'meal_takeaway',
+  'food_truck',
+  'pub',
+  'fast_food_restaurant',
+  'pizza_restaurant',
+]);
+
+const NON_RESTAURANT_FOOD_TYPES = new Set([
+  'supermarket',
+  'grocery_store',
+  'convenience_store',
+  'warehouse_store',
+  'liquor_store',
+  'market',
+]);
+
 function inferCategory(types: string[] = []): Activity['category'] {
   const t = types.map((x) => x.toLowerCase());
-  // Food bucket
-  if (t.some((x) => ['restaurant', 'food', 'cafe', 'meal', 'bakery', 'bar', 'ice_cream_shop'].some((k) => x.includes(k)))) return 'food';
+
+  // Strict food bucket: hospitality/dining venues only.
+  const hasNonRestaurantFoodType = t.some((x) => NON_RESTAURANT_FOOD_TYPES.has(x));
+  const hasRestaurantType = t.some((x) => STRICT_FOOD_TYPES.has(x) || x.endsWith('_restaurant'));
+  if (!hasNonRestaurantFoodType && hasRestaurantType) return 'food';
+
   // Places (Nature/Parks/Landmarks) bucket
   if (t.some((x) => ['park', 'natural_feature', 'beach', 'garden', 'lake', 'landmark', 'tourist_attraction'].some((k) => x.includes(k)))) return 'places';
   // Activities (Entertainment/Shopping/Culture) bucket

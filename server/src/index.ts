@@ -36,7 +36,7 @@ const app = express();
 const FIELDS =
   'places.id,places.displayName,places.location,places.formattedAddress,places.types,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.regularOpeningHours,places.reservable,places.goodForChildren,places.goodForGroups,places.servesVegetarianFood,places.servesBreakfast,places.servesBrunch,places.servesLunch,places.servesDinner,places.outdoorSeating';
 const PLACE_DETAILS_FIELDS =
-  'id,displayName,formattedAddress,location,types,photos,rating,userRatingCount,priceLevel,websiteUri,internationalPhoneNumber,regularOpeningHours,editorialSummary,reviews,googleMapsUri,reservable,goodForChildren,goodForGroups,servesVegetarianFood,servesBreakfast,servesBrunch,servesLunch,servesDinner,outdoorSeating';
+  'id,displayName,formattedAddress,location,types,photos,rating,userRatingCount,priceLevel,websiteUri,internationalPhoneNumber,regularOpeningHours,editorialSummary,reviews,googleMapsUri,googleMapsLinks,reservable,goodForChildren,goodForGroups,servesVegetarianFood,servesBreakfast,servesBrunch,servesLunch,servesDinner,outdoorSeating';
 
 
 
@@ -50,6 +50,28 @@ const NEARBY_TYPE_BUCKETS: string[][] = [
 ];
 
 const MAX_MERGED_RESULTS = 80;
+
+const EXCLUDED_PLACE_TYPES = new Set([
+  'supermarket',
+  'grocery_store',
+  'convenience_store',
+  'warehouse_store',
+]);
+
+const EXCLUDED_SUPERMARKET_NAME_TERMS = [
+  'safeway',
+  'fred meyer',
+  'kroger',
+  'albertsons',
+  'whole foods',
+  'trader joe',
+  'costco',
+  'walmart',
+  'target',
+  'winco',
+  'qfc',
+  'grocery outlet',
+];
 
 function isGenericQuery(q: string): boolean {
   const normalized = q.trim().toLowerCase();
@@ -116,6 +138,16 @@ function isRelevant(p: any, q: string): boolean {
   }
 
   return false;
+}
+
+function isExcludedSupermarketLikePlace(place: Record<string, unknown>): boolean {
+  const types = ((place.types as string[]) ?? []).map((t) => t.toLowerCase());
+  if (types.some((t) => EXCLUDED_PLACE_TYPES.has(t))) {
+    return true;
+  }
+
+  const name = ((place.displayName as { text?: string } | undefined)?.text ?? '').toLowerCase();
+  return EXCLUDED_SUPERMARKET_NAME_TERMS.some((term) => name.includes(term));
 }
 
 function inferPriceLevel(name: string, description: string = '', types: string[] = []): number | undefined {
@@ -717,8 +749,9 @@ app.get('/api/places/nearby', async (req, res) => {
   }
 
   const rawPlaces = (data.places ?? []) as Array<Record<string, unknown>>;
+  const filteredRawPlaces = rawPlaces.filter((p) => !isExcludedSupermarketLikePlace(p));
 
-  const places = rawPlaces.map((p) => {
+  const places = filteredRawPlaces.map((p) => {
     const id = (p.id as string) ?? '';
     const displayName = p.displayName as { text?: string } | undefined;
     const name = displayName?.text ?? '';

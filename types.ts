@@ -65,6 +65,12 @@ export interface PlaceDetails {
     };
   }[];
   googleMapsUri?: string;
+  googleMapsLinks?: {
+    placeUri?: string;
+    reviewsUri?: string;
+    directionsUri?: string;
+    writeAReviewUri?: string;
+  };
 }
 
 
