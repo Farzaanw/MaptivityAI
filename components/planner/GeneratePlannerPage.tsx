@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useRef } from 'react';
 import PlannerMap from './PlannerMap';
 import { buildMarkerData } from '../../services/plannerGeocoding';
 import { generateItinerary } from '../../services/plannerService';
@@ -49,7 +50,16 @@ function buildSavedGeneratedPlan(plan: GeneratedPlan, prompt: string): SavedPlan
 }
 
 const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, onPrepareReservationDraft, onSavePlan }) => {
-  const [tripDescription, setTripDescription] = useState('');
+    // Mic button voice-to-text state
+    const [isRecording, setIsRecording] = useState(false);
+    const [micError, setMicError] = useState<string | null>(null);
+    const recognitionRef = useRef<any>(null);
+    const supportsSpeechRecognition = typeof window !== 'undefined' && (
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    );
+    const [tripDescription, setTripDescription] = useState('');
+    const finalVoiceTranscriptRef = useRef('');
+    const [finalVoiceTranscript, setFinalVoiceTranscript] = useState('');
   const [plans, setPlans] = useState<GeneratedPlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [mappedPlanId, setMappedPlanId] = useState<string | null>(null);
@@ -58,6 +68,76 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
   const [geocodedMarkers, setGeocodedMarkers] = useState<MarkerData[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Handle mic button click
+  const handleMicClick = () => {
+    setMicError(null);
+    if (!supportsSpeechRecognition) return;
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      setIsRecording(false);
+      // When stopped, show the final transcript in the prompt (from ref for latest value)
+      setTripDescription(finalVoiceTranscriptRef.current.trim());
+      return;
+    }
+    // When starting, clear transcript and show 'Listening...'
+    setFinalVoiceTranscript('');
+    finalVoiceTranscriptRef.current = '';
+    setTripDescription('Listening...');
+    try {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = navigator.language || 'en-US';
+      let finalTranscript = '';
+      let silenceTimeout: any = null;
+
+      recognition.onstart = () => {
+        setIsRecording(true);
+      };
+      recognition.onerror = (event: any) => {
+        setMicError('Speech recognition error: ' + event.error);
+        setIsRecording(false);
+      };
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+      recognition.onresult = (event: any) => {
+        let newFinalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            newFinalTranscript += transcript;
+          }
+        }
+        if (newFinalTranscript) {
+          setFinalVoiceTranscript((prev) => {
+            const updated = prev + newFinalTranscript;
+            finalVoiceTranscriptRef.current = updated;
+            return updated;
+          });
+        }
+        // While listening, keep showing 'Listening...'
+        setTripDescription('Listening...');
+        // Reset silence timer
+        if (silenceTimeout) clearTimeout(silenceTimeout);
+        silenceTimeout = setTimeout(() => {
+          recognition.stop();
+          setIsRecording(false);
+          // On pause, show the final transcript
+          setTripDescription((desc) => (finalVoiceTranscript.trim() || desc));
+        }, 3000);
+      };
+      recognition.start();
+    } catch (err: any) {
+      setMicError('Speech recognition failed to start.');
+      setIsRecording(false);
+      // On end, show the final transcript (from ref for latest value)
+      setTripDescription(finalVoiceTranscriptRef.current.trim());
+    }
+  };
   const [isGeocoding, setIsGeocoding] = useState(false);
 
   const selectedPlan = useMemo(
@@ -250,26 +330,20 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
                   placeholder="Example: Plan a relaxed 3-day Seattle trip for two with coffee shops, waterfront walks, a museum, and one memorable dinner."
                 />
 
-                <div className="flex items-center justify-between px-5 pb-4">
-                  <button
-                    type="button"
-                    aria-label="Add details"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full text-2xl font-light text-slate-300 transition hover:bg-white/5 hover:text-white"
-                  >
-                    +
-                  </button>
-
+                <div className="flex items-center justify-end px-5 pb-4">
                   <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      aria-label="Voice input"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-300 transition hover:bg-white/5 hover:text-white"
-                    >
-                      <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
-                        <path d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.92V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.08A7 7 0 0 1 5 12a1 1 0 1 1 2 0 5 5 0 1 0 10 0Z" />
-                      </svg>
-                    </button>
-
+                    {supportsSpeechRecognition && (
+                      <button
+                        type="button"
+                        aria-label="Voice input"
+                        onClick={handleMicClick}
+                        className={`inline-flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/5 ${isRecording ? 'bg-red-600 text-white animate-pulse' : 'text-slate-300 hover:text-white'}`}
+                      >
+                        <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
+                          <path d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.92V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.08A7 7 0 0 1 5 12a1 1 0 1 1 2 0 5 5 0 1 0 10 0Z" />
+                        </svg>
+                      </button>
+                    )}
                     <button
                       type="submit"
                       aria-label={isGenerating ? 'Generating plans' : 'Generate plans'}
@@ -310,9 +384,10 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
             </div> */}
           </form>
 
-          {error && (
+          {(error || micError) && (
             <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {error}
+              {micError && <div>{micError}</div>}
             </div>
           )}
         </section>
