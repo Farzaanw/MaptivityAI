@@ -606,6 +606,8 @@ const App: React.FC = () => {
           if (vibe === 'Cozy' && activity.types?.some(t => ['cafe', 'bakery', 'book_store'].includes(t))) return true;
           if (vibe === 'Tourist Friendly' && activity.types?.some(t => ['tourist_attraction', 'museum', 'landmark'].includes(t))) return true;
           if (vibe === 'Local Gem' && (activity.userRatingCount || 0) < 500 && (activity.rating || 0) >= 4.5) return true;
+          if (vibe === 'Outdoors' && activity.types?.some(t => ['park', 'beach', 'garden', 'lake', 'natural_feature', 'campground', 'hiking_area', 'marina', 'rv_park'].includes(t))) return true;
+          if (vibe === 'Active/Sporty' && activity.types?.some(t => ['gym', 'fitness_center', 'stadium', 'sports_club', 'athletic_field', 'bowling_alley', 'golf_course', 'swimming_pool', 'skating_rink'].includes(t))) return true;
           return false;
         });
         if (!matches) return false;

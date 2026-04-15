@@ -238,7 +238,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onChange, maxDistance })
                     <div>
                         <label className="block text-sm font-bold text-gray-400 uppercase tracking-widest mb-3">Atmosphere</label>
                         <div className="flex flex-wrap gap-2">
-                            {['Family Friendly', 'Good for Groups', 'Lively', 'Cozy', 'Tourist Friendly', 'Local Gem'].map((vibe) => (
+                            {['Family Friendly', 'Good for Groups', 'Lively', 'Cozy', 'Tourist Friendly', 'Local Gem', 'Outdoors', 'Active/Sporty'].map((vibe) => (
                                 <button
                                     key={vibe}
                                     type="button"

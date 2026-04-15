@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url';
+import { extractJsonFromLLM } from './utils/extractJsonFromLLM.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import dotenv from 'dotenv';
@@ -12,8 +13,11 @@ dotenv.config({ path: envPath });
 
 const PORT = 5050;
 const API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY;
-const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434';
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'llama3:latest';
+const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL;
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL;
+// const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434';
+// const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'llama3:latest';
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 }); // 10 min cache, check every 2 min
 
 console.log('[startup] CWD:', process.cwd());
@@ -436,8 +440,8 @@ app.post('/api/planner/itinerary', async (req, res) => {
   const systemPrompt = [
     'You are a practical trip planner.',
     'Return exactly 3 distinct travel plan options as JSON.',
-    'Do not return prose outside JSON.',
-    'Each plan must include id, title, summary, days, and activities.',
+    'Return a single JSON object with a property named "plans" that is an array of the 3 plans. Do not return a raw array, and do not return prose outside the JSON.',
+    'Each plan must include id, title, summary, days (number of days), and activities (a flat array of all activities for the plan, not grouped by day).',
     'Each activity must include name, time, location, and description.',
     'Use short titles and concise summaries.',
     'Make activity times readable, for example "Day 1 - Morning" or "Day 2 - 7:30 PM".',
@@ -445,43 +449,61 @@ app.post('/api/planner/itinerary', async (req, res) => {
   ].join(' ');
 
   try {
-    const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+    // -- PREV LOCAL LLAMA MODEL SET UP COMMENTED OUT
+    // const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+    console.log("OpenRouter key exists?", !!OPENROUTER_MODEL);
+    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
       },
       body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        stream: false,
-        format: plannerJsonSchema,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: prompt },
+        "model": OPENROUTER_MODEL,
+        "messages": [
+          { "role": "system", "content": systemPrompt },
+          { "role": "user", "content": prompt }
         ],
-        options: {
-          temperature: 0.7,
-        },
+        "stream": false,
+        "temperature": 0.7
+        // // model: OLLAMA_MODEL,
+        // format: plannerJsonSchema,
+        // messages: [
+        //   { role: 'system', content: systemPrompt },
+        //   { role: 'user', content: prompt },
+        // ],
+        // stream: false,
+
+        // options: {
+        //   temperature: 0.7,
+        // },
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[planner] Ollama error:', response.status, errorText);
+      // console.error('[planner] Ollama error:', response.status, errorText);
+      console.error('[planner] OpenRouter error:', response.status, errorText); 
       return res.status(502).json({
-        error: 'Unable to reach the local LLaMA model. Make sure Ollama is running and the model is installed.',
+        // error: 'Unable to reach the local LLaMA model. Make sure Ollama is running and the model is installed.',
+        error: 'Unable to reach the OpenRouter API. Check your network connection and API key.',
       });
     }
 
     const data = await response.json() as {
+      choices?: Array<{ message?: { content?: string } }>;
       message?: { content?: string };
     };
-    const rawContent = data.message?.content?.trim();
+    // const rawContent = data.message?.content?.trim();
+    const rawContent = data.choices?.[0]?.message?.content?.trim();
+    console.log('[planner] Raw LLM response:', rawContent);
 
     if (!rawContent) {
       return res.status(502).json({ error: 'The local LLaMA model returned an empty itinerary.' });
     }
 
-    const parsed = safeParsePlannerResponse(rawContent);
+    const parsed = extractJsonFromLLM(rawContent);
+
     if (!parsed) {
       console.error('[planner] Invalid planner JSON:', rawContent);
       return res.status(502).json({
