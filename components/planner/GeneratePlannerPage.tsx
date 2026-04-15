@@ -471,20 +471,20 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
                     >
                       Save to My Plans
                     </button>
-                    <button
+                    {/* <button
                       type="button"
                       onClick={handleReservePlan}
                       className="rounded-full bg-amber-500 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-white transition hover:bg-amber-400"
                     >
                       Reserve Plan
-                    </button>
+                    </button> */}
                   </div>
                 </div>
 
                 <div className="max-h-[540px] space-y-4 overflow-y-auto pr-1">
                   {selectedPlan.dayPlans.map((dayPlan) => (
                     <div key={`${selectedPlan.id}-day-${dayPlan.dayNumber}`} className="space-y-3">
-                      <div className="sticky top-0 rounded-xl bg-slate-900/95 px-3 py-2 text-xs font-bold uppercase tracking-[0.16em] text-sky-300 backdrop-blur">
+                      <div className="sticky top-0 rounded-xl bg-slate-900/95 px-3 py-2 text-xs font-bold uppercase tracking-[0.16em] text-green-300 backdrop-blur">
                         Day {dayPlan.dayNumber}
                       </div>
 
@@ -538,7 +538,7 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
                   ))}
                 </div>
 
-                {selectedActivity && (
+                {/* {selectedActivity && (
                   <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4">
                     <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-200">
                       Activity Details
@@ -555,7 +555,7 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
                       </p>
                     </div>
                   </div>
-                )}
+                )} */}
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-5 text-sm leading-7 text-slate-300">

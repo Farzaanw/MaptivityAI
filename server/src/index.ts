@@ -438,14 +438,12 @@ app.post('/api/planner/itinerary', async (req, res) => {
   }
 
   const systemPrompt = [
-    'You are a practical trip planner.',
-    'Return exactly 3 distinct travel plan options as JSON.',
-    'Return a single JSON object with a property named "plans" that is an array of the 3 plans. Do not return a raw array, and do not return prose outside the JSON.',
-    'Each plan must include id, title, summary, days (number of days), and activities (a flat array of all activities for the plan, not grouped by day).',
-    'Each activity must include name, time, location, and description.',
-    'Use short titles and concise summaries.',
-    'Make activity times readable, for example "Day 1 - Morning" or "Day 2 - 7:30 PM".',
-    'Keep the plans realistic and easy to skim.',
+    'You are a trip planner.',
+    'Respond with a single JSON object: { "plans": [ ... ] }.',
+    'The "plans" array must have exactly 3 options. Each plan: id, title, summary, days (number), activities (flat array, not grouped by day).',
+    'Each activity: name, time, location, description. No prose or extra text, only valid JSON.',
+    'Keep titles and summaries short, times readable (e.g. "Day 1 - Morning").',
+    'Be concise and realistic.'
   ].join(' ');
 
   try {
@@ -502,12 +500,26 @@ app.post('/api/planner/itinerary', async (req, res) => {
       return res.status(502).json({ error: 'The local LLaMA model returned an empty itinerary.' });
     }
 
-    const parsed = extractJsonFromLLM(rawContent);
+    let parsed = extractJsonFromLLM(rawContent);
 
-    if (!parsed) {
-      console.error('[planner] Invalid planner JSON:', rawContent);
+    // If invalid, try fallback: look for 2 plans instead of 3
+    if (!parsed || !Array.isArray(parsed.plans) || parsed.plans.length !== 3) {
+      // Try to extract 2 plans if possible
+      try {
+        const jsonBlock = rawContent.match(/\{[\s\S]*\}/)?.[0];
+        if (jsonBlock) {
+          const fallback = JSON.parse(jsonBlock);
+          if (Array.isArray(fallback.plans) && fallback.plans.length === 2) {
+            parsed = fallback;
+          }
+        }
+      } catch {}
+    }
+
+    if (!parsed || !Array.isArray(parsed.plans) || (parsed.plans.length !== 3 && parsed.plans.length !== 2)) {
+      console.error('[planner] Invalid or incomplete planner JSON:', rawContent);
       return res.status(502).json({
-        error: 'The local LLaMA model returned invalid planner JSON.',
+        error: 'The LLM returned invalid or incomplete planner JSON.',
       });
     }
 
