@@ -1,3 +1,11 @@
+# - Placeholder- Remove once done developing:
+Unsplash Account: https://unsplash.com/@farzaanw
+Supabase acc: https://supabase.com/dashboard/project/nktldmfhnrqkihpqibln
+Openrouter acc: https://openrouter.ai/activity
+Google Cloud account: https://console.cloud.google.com/apis/dashboard?project=maptivity-mvp
+Project Specs: https://docs.google.com/document/d/1fHVqcBVDZ1iIif9O_KTp-K716jhJX2pKqwaSlKrxTWQ/edit?tab=t.0
+# -------------------------------------------------------------------
+
 # Maptivity.ai (v0)
 
 Maptivity.ai is a map-first activity discovery tool.
