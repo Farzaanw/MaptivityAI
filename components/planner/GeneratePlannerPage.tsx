@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRef } from 'react';
+import Lottie from 'lottie-react';
+import cyclistAnimation from '../../src/men run bycicle animation (1).json';
 import PlannerMap from './PlannerMap';
 import { buildMarkerData } from '../../services/plannerGeocoding';
 import { generateItinerary } from '../../services/plannerService';
@@ -119,15 +121,13 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
             return updated;
           });
         }
-        // While listening, keep showing 'Listening...'
-        setTripDescription('Listening...');
         // Reset silence timer
         if (silenceTimeout) clearTimeout(silenceTimeout);
         silenceTimeout = setTimeout(() => {
           recognition.stop();
           setIsRecording(false);
-          // On pause, show the final transcript
-          setTripDescription((desc) => (finalVoiceTranscript.trim() || desc));
+          // On pause, show the final transcript (use ref for latest value)
+          setTripDescription(finalVoiceTranscriptRef.current.trim() || '');
         }, 3000);
       };
       recognition.start();
@@ -404,17 +404,16 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
           </div>
 
           {isGenerating ? (
-            <div className="grid gap-4 lg:grid-cols-3">
-              {[0, 1, 2].map((item) => (
-                <div key={item} className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-                  <div className="h-4 w-24 animate-pulse rounded-full bg-slate-200" />
-                  <div className="mt-4 h-6 animate-pulse rounded-full bg-slate-200" />
-                  <div className="mt-3 space-y-2">
-                    <div className="h-3 animate-pulse rounded-full bg-slate-200" />
-                    <div className="h-3 w-5/6 animate-pulse rounded-full bg-slate-200" />
-                  </div>
-                </div>
-              ))}
+            <div className="flex flex-col items-center justify-center gap-4 py-6">
+              <Lottie
+                animationData={cyclistAnimation}
+                loop
+                autoplay
+                style={{ width: 320, height: 220 }}
+              />
+              <p className="text-sm font-semibold text-slate-500 tracking-wide animate-pulse">
+                Crafting your travel plans…
+              </p>
             </div>
           ) : plans.length > 0 ? (
             <div className="grid gap-4 lg:grid-cols-3">
