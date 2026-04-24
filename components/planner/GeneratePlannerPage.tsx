@@ -424,20 +424,25 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
                 return (
                   <div
                     key={plan.id}
-                    className={`rounded-[26px] border p-5 transition ${
-                      isSelected
-                        ? 'border-sky-400 bg-sky-50 shadow-[0_12px_36px_rgba(14,165,233,0.16)]'
-                        : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-slate-50'
+                    onClick={() => handleSendToMap(plan)}
+                    className={`group cursor-pointer rounded-[26px] border p-5 transition-all duration-300 ${
+                      isMapped
+                        ? 'border-emerald-400 bg-emerald-50 shadow-[0_12px_36px_rgba(16,185,129,0.16)]'
+                        : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-slate-50 hover:shadow-lg'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-600">
+                      <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] transition ${
+                        isMapped ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                      }`}>
                         Option {index + 1}
                       </span>
                       <span className="text-xs font-semibold text-slate-500">{plan.days} days</span>
                     </div>
 
-                    <h4 className="mt-4 text-xl font-black tracking-tight text-slate-900">
+                    <h4 className={`mt-4 text-xl font-black tracking-tight transition ${
+                      isMapped ? 'text-emerald-900' : 'text-slate-900'
+                    }`}>
                       {plan.title}
                     </h4>
 
@@ -445,32 +450,21 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
 
                     <div className="mt-5 flex items-center justify-between text-xs text-slate-500">
                       <span>{plan.activities.length} activities</span>
-                      <span>{isMapped ? 'Mapped now' : 'Ready to map'}</span>
+                      <span className={`font-bold ${isMapped ? 'text-emerald-600' : ''}`}>
+                        {isMapped ? 'Currently Mapped' : 'Ready to map'}
+                      </span>
                     </div>
 
-                    <div className="mt-5 flex gap-3">
+                    <div className="mt-5">
                       <button
                         type="button"
-                        onClick={() => handleSelectPlan(plan)}
-                        className={`flex-1 rounded-full px-4 py-2 text-sm font-bold transition ${
-                          isSelected
-                            ? 'bg-slate-900 text-white'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        className={`w-full rounded-full px-4 py-3 text-sm font-bold transition-all duration-300 pointer-events-none ${
+                          isMapped 
+                            ? 'bg-emerald-200 text-emerald-800' 
+                            : 'bg-slate-100 text-slate-500 group-hover:bg-sky-100 group-hover:text-sky-700'
                         }`}
                       >
-                        {isSelected ? 'Viewing' : 'View Itinerary'}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleSendToMap(plan)}
-                        className={`flex-1 rounded-full px-4 py-2 text-sm font-bold transition ${
-                          isMapped
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-sky-600 text-white hover:bg-sky-700'
-                        }`}
-                      >
-                        {isMapped ? 'On Map' : 'Send to Map'}
+                        {isMapped ? 'Viewing Itinerary' : 'Click to View Itinerary'}
                       </button>
                     </div>
                   </div>
@@ -490,7 +484,7 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
               <div>
                 <p className="text-md px-3 py-1 font-bold uppercase tracking-[0.08em] text-slate-700">Map View</p>
                 <h3 className="mt-2 text-2xl font-black text-slate-900">
-                  {mappedPlan ? `${mappedPlan.title} on the map` : ''}
+                  {mappedPlan ? `${mappedPlan.title}` : ''}
                 </h3>
               </div>
               <div className="flex gap-2">
@@ -532,7 +526,7 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
             {selectedPlan ? (
               <div className="space-y-5">
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-sm leading-6 text-slate-200">{selectedPlan.summary}</p>
+                  <p className="text-xl font-bold leading-7 text-slate-200">{selectedPlan.title}</p>
                   <div className="mt-3 flex items-center gap-3 text-xs uppercase tracking-[0.14em] text-sky-200">
                     <span>{selectedPlan.activities.length} total stops</span>
                     <span>{mappedPlanId === selectedPlan.id ? 'Currently mapped' : 'Not mapped yet'}</span>
@@ -541,7 +535,7 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
                     <button
                       type="button"
                       onClick={handleSavePlan}
-                      className="rounded-full bg-sky-500 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-white transition hover:bg-sky-400"
+                      className="rounded-full bg-sky-500 px-7 py-5 text-sm font-black uppercase tracking-[0.14em] text-white transition hover:bg-sky-400"
                     >
                       Save to My Plans
                     </button>
@@ -555,7 +549,7 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
                   </div>
                 </div>
 
-                <div className="max-h-[540px] space-y-4 overflow-y-auto pr-1">
+                <div className="max-h-[540px] space-y-4 overflow-y-auto pr-2 scrollbar-refined">
                   {selectedPlan.dayPlans.map((dayPlan) => (
                     <div key={`${selectedPlan.id}-day-${dayPlan.dayNumber}`} className="space-y-3">
                       <div className="sticky top-0 rounded-xl bg-slate-900/95 px-3 py-2 text-xs font-bold uppercase tracking-[0.16em] text-green-300 backdrop-blur">

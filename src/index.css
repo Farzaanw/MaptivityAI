@@ -11,3 +11,29 @@
 
 @import "tailwindcss";
 
+@layer utilities {
+  /* Modern, subtle scrollbar for dark containers */
+  .scrollbar-refined {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(56, 189, 248, 0.2) transparent; /* sky-400 with low opacity */
+  }
+
+  .scrollbar-refined::-webkit-scrollbar {
+    width: 5px;
+  }
+
+  .scrollbar-refined::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-refined::-webkit-scrollbar-thumb {
+    background-color: rgba(56, 189, 248, 0.2);
+    border-radius: 20px;
+    transition: background-color 0.2s;
+  }
+
+  .scrollbar-refined::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(56, 189, 248, 0.4);
+  }
+}
+
