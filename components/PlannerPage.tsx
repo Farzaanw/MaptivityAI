@@ -10,6 +10,7 @@ interface PlannerPageProps {
   routePath: string;
   onNavigate: (path: '/planner' | '/planner/generate' | '/planner/manual' | '/planner/reserve') => void;
   favorites: SavedActivity[];
+  savedPlans: SavedPlannerPlan[];
   reservationDraft: ReservationDraft | null;
   onPrepareReservationDraft: (draft: ReservationDraft) => void;
   onSavePlan: (plan: SavedPlannerPlan) => void;
@@ -19,6 +20,7 @@ const PlannerPage: React.FC<PlannerPageProps> = ({
   routePath,
   onNavigate,
   favorites,
+  savedPlans,
   reservationDraft,
   onPrepareReservationDraft,
   onSavePlan,
@@ -38,6 +40,7 @@ const PlannerPage: React.FC<PlannerPageProps> = ({
       <ManualPlannerPage
         onNavigate={onNavigate}
         favorites={favorites}
+        savedPlans={savedPlans}
         onPrepareReservationDraft={onPrepareReservationDraft}
         onSavePlan={onSavePlan}
       />

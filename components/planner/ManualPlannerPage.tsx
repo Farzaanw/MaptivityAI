@@ -23,6 +23,7 @@ import type { Activity as SavedActivity } from '../../types';
 interface ManualPlannerPageProps {
   onNavigate: (path: '/planner' | '/planner/generate' | '/planner/manual' | '/planner/reserve') => void;
   favorites: SavedActivity[];
+  savedPlans: SavedPlannerPlan[];
   onPrepareReservationDraft: (draft: ReservationDraft) => void;
   onSavePlan: (plan: SavedPlannerPlan) => void;
 }
@@ -112,6 +113,46 @@ function buildManualReservationDraft(plan: Plan): ReservationDraft {
     ),
   };
 }
+
+const DiscoveryPlanCard: React.FC<{ 
+  plan: SavedPlannerPlan; 
+  onSelect: (plan: SavedPlannerPlan) => void;
+  isSelected?: boolean;
+}> = ({ plan, onSelect, isSelected }) => {
+  return (
+    <div 
+      onClick={() => onSelect(plan)}
+      className={`group cursor-pointer rounded-[24px] border p-4 transition-all duration-300 ${
+        isSelected 
+          ? 'border-emerald-400 bg-emerald-50 shadow-[0_10px_40px_rgba(16,185,129,0.16)] ring-2 ring-emerald-400/20 scale-[1.02]' 
+          : 'border-slate-200 bg-white shadow-sm hover:border-emerald-200 hover:shadow-md'
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className={`text-sm font-black truncate transition-colors ${isSelected ? 'text-emerald-800' : 'text-slate-900 group-hover:text-emerald-700'}`}>{plan.title}</p>
+          <div className="mt-2 flex items-center gap-2">
+            <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${
+              plan.kind === 'generated' 
+                ? (isSelected ? 'bg-sky-200 text-sky-800' : 'bg-sky-100 text-sky-700') 
+                : (isSelected ? 'bg-emerald-200 text-emerald-800' : 'bg-emerald-100 text-emerald-700')
+            }`}>
+              {plan.kind === 'generated' ? 'AI-Generated' : 'Manual'}
+            </span>
+          </div>
+        </div>
+        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${
+          isSelected ? 'bg-emerald-500 text-white' : 'bg-slate-50 group-hover:bg-emerald-50 group-hover:text-emerald-600'
+        }`}>
+          <svg viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current stroke-[3]">
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+        </div>
+      </div>
+      <p className={`mt-3 text-xs leading-5 line-clamp-1 ${isSelected ? 'text-emerald-600/80' : 'text-slate-500'}`}>{plan.subtitle}</p>
+    </div>
+  );
+};
 
 function PlannerLocationSearch({
   value,
@@ -403,12 +444,12 @@ const DayDropZone: React.FC<{
   );
 };
 
-function buildSavedManualPlan(plan: Plan, destination: PlannerLocation | null): SavedPlannerPlan {
+function buildSavedManualPlan(plan: Plan, destination: PlannerLocation | null, existingId?: string | null): SavedPlannerPlan {
   const activityCount = plan.days.reduce((count, day) => count + day.activities.length, 0);
 
   return {
     kind: 'manual',
-    id: `saved-manual-${plan.id}-${Date.now()}`,
+    id: existingId || `saved-manual-${plan.id}-${Date.now()}`,
     createdAt: new Date().toISOString(),
     title: destination ? `${destination.name} custom plan` : 'Custom manual plan',
     subtitle: destination
@@ -424,6 +465,7 @@ function buildSavedManualPlan(plan: Plan, destination: PlannerLocation | null): 
 const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
   onNavigate,
   favorites,
+  savedPlans,
   onPrepareReservationDraft,
   onSavePlan,
 }) => {
@@ -433,7 +475,10 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [discoveryMode, setDiscoveryMode] = useState<'search' | 'favorites' | 'plans'>('search');
+  const [pendingPlanToSwitch, setPendingPlanToSwitch] = useState<SavedPlannerPlan | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
   const [plan, setPlan] = useState<Plan>({
     id: 'manual-plan',
     days: [{ day: 1, activities: [] }],
@@ -458,7 +503,7 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
     [favorites],
   );
 
-  const activityDiscoveryItems = showFavoritesOnly ? favoriteActivities : discoveredActivities;
+
 
   const loadActivities = async (location: PlannerLocation) => {
     setIsLoadingActivities(true);
@@ -636,9 +681,96 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
     onNavigate('/planner/reserve');
   };
 
-  const handleSavePlan = () => {
+  const handleSavePlan = async () => {
     if (plannedCount === 0) return;
-    onSavePlan(buildSavedManualPlan(plan, selectedLocation));
+    
+    setIsResetting(true);
+    // Show "Saving" animation to match the "Start Fresh" flow
+    await new Promise((resolve) => setTimeout(resolve, 1400));
+    
+    const newPlan = buildSavedManualPlan(plan, selectedLocation, editingPlanId);
+    onSavePlan(newPlan);
+    
+    // Lock the ID so the next save updates this same card
+    setEditingPlanId(newPlan.id);
+    setIsResetting(false);
+  };
+
+  const confirmPlanSwitch = () => {
+    if (!pendingPlanToSwitch) return;
+
+    // 1. Auto-save current progress if it has content
+    if (plannedCount > 0) {
+      onSavePlan(buildSavedManualPlan(plan, selectedLocation, editingPlanId));
+    }
+
+    // 2. Load the target plan
+    setEditingPlanId(pendingPlanToSwitch.id);
+    if (pendingPlanToSwitch.kind === 'manual') {
+      setPlan(clonePlan(pendingPlanToSwitch.plan));
+      setSelectedLocation(pendingPlanToSwitch.destination);
+      if (pendingPlanToSwitch.destination) {
+        setLocationQuery(pendingPlanToSwitch.destination.name);
+        void loadActivities(pendingPlanToSwitch.destination);
+      }
+    } else {
+      // AI to Manual conversion
+      const convertedPlan: Plan = {
+        id: pendingPlanToSwitch.plan.id,
+        days: pendingPlanToSwitch.plan.dayPlans.map((dp) => ({
+          day: dp.dayNumber,
+          activities: dp.activities.map((act) => ({
+            id: act.id,
+            name: act.name,
+            address: act.location,
+            lat: 0,
+            lng: 0,
+            description: act.description,
+          })),
+        })),
+      };
+      setPlan(convertedPlan);
+      setSelectedLocation(null);
+      setLocationQuery('');
+      setDiscoveredActivities([]);
+    }
+
+    setActiveDay(1);
+    setPendingPlanToSwitch(null);
+  };
+
+  const handleCreateNewPlan = async () => {
+    if (plannedCount > 0) {
+      setIsResetting(true);
+
+      // Brief delay to show "Saving" animation
+      await new Promise((resolve) => setTimeout(resolve, 1400));
+
+      const newPlan = buildSavedManualPlan(plan, selectedLocation, editingPlanId);
+      onSavePlan(newPlan);
+
+      setPlan({
+        id: `manual-plan-${Date.now()}`,
+        days: [{ day: 1, activities: [] }],
+      });
+      setSelectedLocation(null);
+      setLocationQuery('');
+      setDiscoveredActivities([]);
+      setActiveDay(1);
+      setEditingPlanId(null);
+
+      setIsResetting(false);
+    } else {
+      setPlan({
+        id: `manual-plan-${Date.now()}`,
+        days: [{ day: 1, activities: [] }],
+      });
+      setSelectedLocation(null);
+      setLocationQuery('');
+      setDiscoveredActivities([]);
+      setActiveDay(1);
+      setEditingPlanId(null);
+    }
   };
 
   return (
@@ -668,6 +800,18 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                 drag them to the planning canvas, add days to your trip, and reorder them 
                 until your itinerary feels just right.
               </p>
+
+              <div className="mt-8">
+                <button
+                  type="button"
+                  onClick={handleCreateNewPlan}
+                  className="group relative flex items-center gap-3 rounded-[20px] bg-slate-900 px-7 py-4 text-sm font-black text-white transition-all duration-300 hover:scale-105 shadow-[0_20px_60px_rgba(15,23,42,0.14)] active:scale-95"
+                >
+                  <div className="absolute -inset-1 rounded-[22px] bg-gradient-to-r from-emerald-400 to-sky-400 opacity-0 blur-lg transition-opacity group-hover:opacity-70" />
+                  <span className="relative text-xl">♻️</span>
+                  <span className="relative uppercase tracking-[0.2em]">Start fresh / New Plan</span>
+                </button>
+              </div>
             </div>
 
             {/* <div className="rounded-[28px] border border-emerald-100 bg-emerald-50/70 p-5">
@@ -810,16 +954,16 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
           onDragCancel={() => setActiveDrag(null)}
           onDragEnd={handleDragEnd}
         >
-          <div className="grid gap-8 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+          <div className="grid gap-8 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] focus:outline-none">
             <section className="rounded-[32px] border border-slate-200 bg-white/85 p-6 shadow-[0_18px_70px_rgba(15,23,42,0.08)]">
               <div className="mb-5">
                 <p className="text-sm font-bold uppercase tracking-[0.1em] text-slate-500">Activity Discovery</p>
                 <div className="mt-5 inline-flex rounded-full border border-slate-200 bg-slate-100 p-1">
                   <button
                     type="button"
-                    onClick={() => setShowFavoritesOnly(false)}
+                    onClick={() => setDiscoveryMode('search')}
                     className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.14em] transition ${
-                      !showFavoritesOnly
+                      discoveryMode === 'search'
                         ? 'bg-white text-slate-900 shadow-sm'
                         : 'text-slate-500 hover:text-slate-700'
                     }`}
@@ -828,34 +972,70 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowFavoritesOnly(true)}
+                    onClick={() => setDiscoveryMode('favorites')}
                     className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.14em] transition ${
-                      showFavoritesOnly
-                        ? 'bg-rose-500 text-white shadow-sm hover:bg-rose-600'
+                      discoveryMode === 'favorites'
+                        ? 'bg-white text-rose-500 shadow-sm'
                         : 'text-slate-500 hover:text-rose-600'
                     }`}
                   >
                     Show Favorites
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDiscoveryMode('plans')}
+                    className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.14em] transition ${
+                      discoveryMode === 'plans'
+                        ? 'bg-white text-emerald-600 shadow-sm'
+                        : 'text-slate-500 hover:text-emerald-700'
+                    }`}
+                  >
+                    Show My Plans
                   </button>
                 </div>
               </div>
 
               <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
-                  {showFavoritesOnly ? null : (
+                  {discoveryMode === 'search' && (
                     <PlannerLocationSearch
                       value={locationQuery}
                       onValueChange={setLocationQuery}
                       onLocationSelected={handleLocationSelected}
                     />
                   )}
+                  {discoveryMode === 'favorites' && (
+                    <div className="py-2 text-sm font-bold text-rose-500 uppercase tracking-widest">Your Favorites</div>
+                  )}
+                  {discoveryMode === 'plans' && (
+                    <div className="py-2 text-sm font-bold text-emerald-600 uppercase tracking-widest">Saved Itineraries</div>
+                  )}
                 </div>
-                <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                  {activityDiscoveryItems.length} found
-                </div>
+                {discoveryMode !== 'plans' && (
+                  <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                    {(discoveryMode === 'search' ? discoveredActivities : favoriteActivities).length} found
+                  </div>
+                )}
               </div>
 
-              {isLoadingActivities && !showFavoritesOnly ? (
+              {discoveryMode === 'plans' ? (
+                <div className="grid max-h-[820px] gap-4 overflow-y-auto pr-1">
+                  {savedPlans.length > 0 ? (
+                    savedPlans.map((plan) => (
+                      <DiscoveryPlanCard 
+                        key={plan.id} 
+                        plan={plan} 
+                        onSelect={setPendingPlanToSwitch} 
+                        isSelected={pendingPlanToSwitch?.id === plan.id}
+                      />
+                    ))
+                  ) : (
+                    <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-16 text-center text-sm leading-7 text-slate-500">
+                      You haven't saved any plans yet.
+                    </div>
+                  )}
+                </div>
+              ) : isLoadingActivities && discoveryMode === 'search' ? (
                 <div className="space-y-4">
                   {[0, 1, 2].map((item) => (
                     <div key={item} className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
@@ -865,9 +1045,9 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                     </div>
                   ))}
                 </div>
-              ) : activityDiscoveryItems.length > 0 ? (
+              ) : (discoveryMode === 'search' ? discoveredActivities : favoriteActivities).length > 0 ? (
                 <div className="grid max-h-[820px] gap-4 overflow-y-auto pr-1">
-                  {activityDiscoveryItems.map((activity) => (
+                  {(discoveryMode === 'search' ? discoveredActivities : favoriteActivities).map((activity) => (
                     <div key={activity.id} className="relative">
                       <DiscoveryCard activity={activity} />
                       {plannedActivityIds.has(activity.id) && (
@@ -880,14 +1060,59 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                 </div>
               ) : (
                 <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-16 text-center text-sm leading-7 text-slate-500">
-                  {showFavoritesOnly
+                  {discoveryMode === 'favorites'
                     ? 'No favorites saved from the map'
                     : 'Select a location to load the most popular nearby places'}
                 </div>
               )}
             </section>
 
-            <section className="rounded-[32px] border border-slate-200 bg-slate-950 p-6 text-slate-100 shadow-[0_24px_80px_rgba(15,23,42,0.24)]">
+            <section className="relative rounded-[32px] border border-slate-200 bg-slate-950 p-6 text-slate-100 shadow-[0_24px_80px_rgba(15,23,42,0.24)]">
+              {isResetting && (
+                <div className="absolute inset-0 z-[60] flex items-center justify-center overflow-hidden rounded-[32px] bg-slate-900/60 p-6 backdrop-blur-md animate-in fade-in duration-300">
+                  <div className="flex flex-col items-center gap-6">
+                    <div className="text-6xl animate-spin" style={{ animationDuration: '3s' }}>
+                      ♻️
+                    </div>
+                    <p className="text-sm font-black uppercase tracking-[0.25em] text-white">Saving this Plan</p>
+                  </div>
+                </div>
+              )}
+
+              {pendingPlanToSwitch && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center overflow-hidden rounded-[32px] bg-slate-900/60 p-6 backdrop-blur-md animate-in fade-in duration-300">
+                  <div className="w-full max-w-sm rounded-[32px] border border-white/20 bg-slate-900 p-8 shadow-2xl animate-in zoom-in-95 duration-300">
+                    {/* <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
+                      <svg viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current stroke-2">
+                        <path d="M11 5L6 9H2V15H6L11 19V5Z" />
+                        <path d="M19.07 4.93C20.94 6.8 22 9.3 22 12C22 14.7 20.94 17.2 19.07 19.07" />
+                        <path d="M15.54 8.46C16.48 9.4 17 10.64 17 12C17 13.36 16.48 14.6 15.54 15.54" />
+                      </svg>
+                    </div> */}
+                    <h4 className="mt-6 text-xl font-black text-center text-white">Start editing this plan?</h4>
+                    <p className="mt-2 text-sm text-center leading-6 text-slate-400">
+                      This will automatically save your current progress to "My Plans" and load the new itinerary into here
+                    </p>
+                    <div className="mt-8 flex gap-3">
+                      <button
+                        type="button"
+                        onClick={confirmPlanSwitch}
+                        className="flex-1 rounded-full bg-emerald-500 py-3 text-sm font-black text-white transition hover:bg-emerald-600"
+                      >
+                        Yes, Switch
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingPlanToSwitch(null)}
+                        className="flex-1 rounded-full bg-white/10 py-3 text-sm font-black text-white transition hover:bg-white/20"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">Planning Canvas</p>

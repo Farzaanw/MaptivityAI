@@ -179,8 +179,18 @@ const App: React.FC = () => {
   }, [currentPath]);
 
   const handleSavePlan = useCallback((plan: SavedPlannerPlan) => {
-    setSavedPlans((current) => [plan, ...current]);
+    setSavedPlans((current) => {
+      // Filter out any existing version of this plan to prevent duplicates
+      // and allow the new version to jump to the top ([plan, ...filtered])
+      const remaining = current.filter((p) => p.id !== plan.id);
+      return [plan, ...remaining];
+    });
     setToast({ message: 'Saved to My Plans', visible: true });
+  }, []);
+
+  const handleDeletePlan = useCallback((planId: string) => {
+    setSavedPlans((current) => current.filter((p) => p.id !== planId));
+    setToast({ message: 'Plan removed from library', visible: true });
   }, []);
 
 
@@ -861,6 +871,7 @@ const App: React.FC = () => {
               routePath={plannerRoute}
               onNavigate={navigateToPath as (path: PlannerRoute) => void}
               favorites={favorites}
+              savedPlans={savedPlans}
               reservationDraft={reservationDraft}
               onPrepareReservationDraft={setReservationDraft}
               onSavePlan={handleSavePlan}
@@ -868,7 +879,7 @@ const App: React.FC = () => {
           )}
 
           {activePage === 'my-plans' && (
-            <MyPlansPage plans={savedPlans} />
+            <MyPlansPage plans={savedPlans} onDeletePlan={handleDeletePlan} />
           )}
 
           {/* ── Favorites page ─────────────────────────────────────── */}

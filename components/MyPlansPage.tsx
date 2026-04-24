@@ -5,6 +5,7 @@ import { buildMarkerData } from '../services/plannerGeocoding';
 
 interface MyPlansPageProps {
   plans: SavedPlannerPlan[];
+  onDeletePlan: (planId: string) => void;
 }
 
 function formatSavedDate(iso: string): string {
@@ -17,66 +18,74 @@ function formatSavedDate(iso: string): string {
   });
 }
 
-const SavedPlanCard: React.FC<{ plan: SavedPlannerPlan, onClick: () => void }> = ({ plan, onClick }) => {
-  const [showPrompt, setShowPrompt] = useState(false);
-
+const SavedPlanCard: React.FC<{ 
+  plan: SavedPlannerPlan, 
+  onClick: () => void,
+  onDelete: (e: React.MouseEvent) => void 
+}> = ({ plan, onClick, onDelete }) => {
   return (
     <article
       onClick={onClick}
-      className="group relative flex flex-col cursor-pointer rounded-[28px] border border-slate-200 bg-white/90 p-6 shadow-[0_18px_60px_rgba(15,23,42,0.06)] transition-all duration-300 hover:border-sky-300 hover:bg-white hover:shadow-[0_24px_80px_rgba(14,165,233,0.12)] backdrop-blur"
+      className={`group relative flex flex-col min-h-[300px] cursor-pointer rounded-[28px] border border-slate-200 bg-white/90 p-7 shadow-[0_18px_60px_rgba(15,23,42,0.06)] transition-all duration-300 backdrop-blur ${
+        plan.kind === 'manual'
+          ? 'hover:border-emerald-300 hover:shadow-[0_24px_80px_rgba(16,185,129,0.12)]'
+          : 'hover:border-sky-300 hover:shadow-[0_24px_80px_rgba(14,165,233,0.12)]'
+      } hover:bg-white`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] ${plan.kind === 'generated'
-            ? 'bg-sky-100 text-sky-700'
-            : 'bg-emerald-100 text-emerald-700'
-          }`}>
-          {plan.kind === 'generated' ? 'Generated Plan' : 'Build Your Own'}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] ${plan.kind === 'generated'
+              ? 'bg-sky-100 text-sky-700'
+              : 'bg-emerald-100 text-emerald-700'
+            }`}>
+            {plan.kind === 'generated' ? 'Generated Plan' : 'Build Your Own'}
+          </div>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{formatSavedDate(plan.createdAt)}</span>
         </div>
-        <span className="text-xs font-semibold text-slate-400">{formatSavedDate(plan.createdAt)}</span>
+        
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(e);
+          }}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-50 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+          title="Remove plan"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current stroke-2">
+            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" />
+          </svg>
+        </button>
       </div>
 
-      <h2 className="mt-4 text-2xl font-black tracking-tight text-slate-900 group-hover:text-sky-900 transition-colors line-clamp-1">{plan.title}</h2>
-      <p className="mt-3 text-sm leading-6 text-slate-600 line-clamp-2">{plan.subtitle}</p>
-
-      {plan.kind === 'generated' && (
-        <div className="mt-4" onClick={(e) => e.stopPropagation()}>
-          <button
-            onClick={() => setShowPrompt(!showPrompt)}
-            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 transition hover:text-sky-600"
-          >
-            <svg viewBox="0 0 24 24" className={`h-3 w-3 fill-current transition-transform duration-300 ${showPrompt ? 'rotate-180' : ''}`}>
-              <path d="m12 15.4-6-6L7.4 8l4.6 4.6L16.6 8 18 9.4l-6 6Z" />
-            </svg>
-            {showPrompt ? 'Hide Prompt' : 'View Your Prompt'}
-          </button>
-
-          {showPrompt && (
-            <div className="mt-3 rounded-2xl bg-slate-50 p-4 border border-slate-100 animate-in slide-in-from-top-2 duration-300">
-              <p className="text-xs italic leading-relaxed text-slate-600">"{plan.prompt}"</p>
-            </div>
-          )}
-        </div>
-      )}
+      <div className="flex flex-col">
+        <h2 className="mt-5 text-2xl font-black tracking-tight text-slate-900 group-hover:text-slate-950 transition-colors line-clamp-1">
+          {plan.title}
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-slate-500 line-clamp-2">
+          {plan.subtitle}
+        </p>
+      </div>
 
       <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-5 mt-8">
         <div className="flex gap-2">
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+          <span className="rounded-full bg-slate-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
             {plan.days} day{plan.days === 1 ? '' : 's'}
           </span>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+          <span className="rounded-full bg-slate-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
             {plan.activityCount} stop{plan.activityCount === 1 ? '' : 's'}
           </span>
         </div>
-        <div className="text-[11px] font-bold uppercase tracking-widest text-sky-600 group-hover:translate-x-1 transition-transform">
-          View Detail &rarr;
+        <div className="text-[11px] font-black uppercase tracking-widest text-sky-600 group-hover:translate-x-1 transition-transform">
+          View Plan &rarr;
         </div>
       </div>
     </article>
   );
 };
 
-const MyPlansPage: React.FC<MyPlansPageProps> = ({ plans }) => {
+const MyPlansPage: React.FC<MyPlansPageProps> = ({ plans, onDeletePlan }) => {
   const [selectedPlan, setSelectedPlan] = useState<SavedPlannerPlan | null>(null);
+  const [planToDelete, setPlanToDelete] = useState<string | null>(null);
   const [geocodedMarkers, setGeocodedMarkers] = useState<MarkerData[]>([]);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [hoveredActivityId, setHoveredActivityId] = useState<string | null>(null);
@@ -188,9 +197,42 @@ const MyPlansPage: React.FC<MyPlansPageProps> = ({ plans }) => {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
           {plans.map((plan) => (
-            <SavedPlanCard key={plan.id} plan={plan} onClick={() => setSelectedPlan(plan)} />
+            <div key={plan.id} className="relative">
+              <SavedPlanCard
+                plan={plan}
+                onClick={() => setSelectedPlan(plan)}
+                onDelete={() => setPlanToDelete(plan.id)}
+              />
+              
+              {planToDelete === plan.id && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[28px] bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
+                  <div className="mx-4 rounded-[28px] bg-white p-6 shadow-2xl text-center">
+                    <p className="text-sm font-black text-slate-900 leading-normal">
+                      Are you sure you want to remove this plan?
+                    </p>
+                    <div className="mt-5 flex gap-3">
+                      <button
+                        onClick={() => {
+                          onDeletePlan(plan.id);
+                          setPlanToDelete(null);
+                        }}
+                        className="flex-1 rounded-full bg-rose-600 py-2 text-xs font-black uppercase tracking-wider text-white hover:bg-rose-700 transition"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        onClick={() => setPlanToDelete(null)}
+                        className="flex-1 rounded-full bg-slate-100 py-2 text-xs font-black uppercase tracking-wider text-slate-600 hover:bg-slate-200 transition"
+                      >
+                        No
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           ))}
         </div>
       </div>
