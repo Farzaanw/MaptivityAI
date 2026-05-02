@@ -10,11 +10,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.resolve(__dirname, '..', '.env');
 dotenv.config({ path: envPath });
 
-const PORT = 5050;
-const API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY;
+const PORT = Number(process.env.PORT ?? 5050);
+const API_KEY = process.env.GOOGLE_PLACES_API_KEY ?? process.env.VITE_GOOGLE_MAPS_API_KEY;
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const trustProxy = process.env.TRUST_PROXY === 'true';
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'llama3:latest';
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 }); // 10 min cache, check every 2 min
+const rateLimitCache = new NodeCache({ stdTTL: 900, checkperiod: 120 });
 
 console.log('[startup] CWD:', process.cwd());
 console.log('[startup] Resolved .env path:', envPath);
@@ -33,6 +39,69 @@ if (
 }
 
 const app = express();
+if (trustProxy) {
+  app.set('trust proxy', 1);
+}
+
+function numberFromEnv(name: string, fallback: number): number {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function createRateLimiter(options: {
+  windowMs: number;
+  maxRequests: number;
+  keyPrefix: string;
+  message: string;
+}) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+    const windowId = Math.floor(Date.now() / options.windowMs);
+    const key = `rate:${options.keyPrefix}:${clientIp}:${windowId}`;
+    const currentCount = (rateLimitCache.get<number>(key) ?? 0) + 1;
+    rateLimitCache.set(key, currentCount, Math.ceil(options.windowMs / 1000));
+
+    const resetSeconds = Math.max(1, Math.ceil(((windowId + 1) * options.windowMs - Date.now()) / 1000));
+    res.setHeader('RateLimit-Limit', String(options.maxRequests));
+    res.setHeader('RateLimit-Remaining', String(Math.max(options.maxRequests - currentCount, 0)));
+    res.setHeader('RateLimit-Reset', String(resetSeconds));
+
+    if (currentCount > options.maxRequests) {
+      res.setHeader('Retry-After', String(resetSeconds));
+      return res.status(429).json({ error: options.message });
+    }
+
+    return next();
+  };
+}
+
+const apiRateLimiter = createRateLimiter({
+  windowMs: numberFromEnv('RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000),
+  maxRequests: numberFromEnv('RATE_LIMIT_MAX_REQUESTS', 300),
+  keyPrefix: 'api',
+  message: 'Too many requests. Please wait a bit and try again.',
+});
+
+const placesRateLimiter = createRateLimiter({
+  windowMs: numberFromEnv('PLACES_RATE_LIMIT_WINDOW_MS', 60 * 1000),
+  maxRequests: numberFromEnv('PLACES_RATE_LIMIT_MAX_REQUESTS', 60),
+  keyPrefix: 'places',
+  message: 'Too many map or places requests. Please wait a bit and try again.',
+});
+
+const plannerRateLimiter = createRateLimiter({
+  windowMs: numberFromEnv('PLANNER_RATE_LIMIT_WINDOW_MS', 60 * 1000),
+  maxRequests: numberFromEnv('PLANNER_RATE_LIMIT_MAX_REQUESTS', 10),
+  keyPrefix: 'planner',
+  message: 'Too many planner requests. Please wait a bit and try again.',
+});
+
+const photoRateLimiter = createRateLimiter({
+  windowMs: numberFromEnv('PHOTO_RATE_LIMIT_WINDOW_MS', 60 * 1000),
+  maxRequests: numberFromEnv('PHOTO_RATE_LIMIT_MAX_REQUESTS', 120),
+  keyPrefix: 'photo',
+  message: 'Too many photo requests. Please wait a bit and try again.',
+});
 const FIELDS =
   'places.id,places.displayName,places.location,places.formattedAddress,places.types,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.regularOpeningHours,places.reservable,places.goodForChildren,places.goodForGroups,places.servesVegetarianFood,places.servesBreakfast,places.servesBrunch,places.servesLunch,places.servesDinner,places.outdoorSeating';
 const PLACE_DETAILS_FIELDS =
@@ -483,7 +552,11 @@ async function searchPlannerMarker(query: string): Promise<{ lat: number; lng: n
 app.use(
   cors({
     origin: (origin, cb) => {
-      if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$/.test(origin)) {
+      if (
+        !origin
+        || allowedOrigins.includes(origin)
+        || /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$/.test(origin)
+      ) {
         cb(null, true);
       } else {
         cb(null, false);
@@ -491,9 +564,21 @@ app.use(
     },
   })
 );
-app.use(express.json());
+app.disable('x-powered-by');
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-Frame-Options', 'DENY');
+  next();
+});
+app.use('/api', apiRateLimiter);
+app.use(express.json({ limit: '64kb' }));
 
-app.post('/api/planner/itinerary', async (req, res) => {
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true });
+});
+
+app.post('/api/planner/itinerary', plannerRateLimiter, async (req, res) => {
   const prompt = typeof req.body?.prompt === 'string' ? req.body.prompt.trim() : '';
 
   if (!prompt) {
@@ -565,7 +650,7 @@ app.post('/api/planner/itinerary', async (req, res) => {
   }
 });
 
-app.post('/api/planner/markers', async (req, res) => {
+app.post('/api/planner/markers', placesRateLimiter, async (req, res) => {
   const activities = req.body?.activities;
 
   if (!Array.isArray(activities) || !activities.every(isPlannerMarkerLookup)) {
@@ -600,7 +685,7 @@ app.post('/api/planner/markers', async (req, res) => {
   }
 });
 
-app.post('/api/planner/discover', async (req, res) => {
+app.post('/api/planner/discover', placesRateLimiter, async (req, res) => {
   const lat = Number(req.body?.lat);
   const lng = Number(req.body?.lng);
   const radiusMeters = Math.min(Math.max(Number(req.body?.radiusMeters) || 6000, 1000), 15000);
@@ -701,7 +786,7 @@ app.post('/api/planner/discover', async (req, res) => {
   }
 });
 
-app.get('/api/places/nearby', async (req, res) => {
+app.get('/api/places/nearby', placesRateLimiter, async (req, res) => {
   const lat = parseFloat(req.query.lat as string);
   const lng = parseFloat(req.query.lng as string);
   const radius = parseInt(req.query.radius as string, 10);
@@ -876,7 +961,7 @@ app.get('/api/places/nearby', async (req, res) => {
   res.json(result);
 });
 
-app.get('/api/places/details/:placeId', async (req, res) => {
+app.get('/api/places/details/:placeId', placesRateLimiter, async (req, res) => {
   const { placeId } = req.params;
   if (!placeId) return res.status(400).json({ error: 'placeId is required' });
   if (!API_KEY) return res.status(500).json({ error: 'API_KEY not configured' });
@@ -905,7 +990,7 @@ app.get('/api/places/details/:placeId', async (req, res) => {
   }
 });
 
-app.get('/api/places/photo/:photoName(*)', async (req, res) => {
+app.get('/api/places/photo/:photoName(*)', photoRateLimiter, async (req, res) => {
   const photoName = req.params.photoName;
   const maxWidth = req.query.maxHeightPx || 800;
   const maxHeight = req.query.maxWidthPx || 800;
@@ -931,6 +1016,13 @@ app.get('/api/places/photo/:photoName(*)', async (req, res) => {
   }
 });
 
+const frontendDistPath = path.resolve(__dirname, '..', '..', 'dist');
+if (fs.existsSync(frontendDistPath)) {
+  app.use(express.static(frontendDistPath));
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(frontendDistPath, 'index.html'));
+  });
+}
 
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);

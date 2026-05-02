@@ -5,7 +5,7 @@
  * Handles sign-up, sign-in, OAuth, password reset, sign-out, and session management.
  */
 
-import { supabase } from './supabaseClient';
+import { isSupabaseConfigured, supabase } from './supabaseClient';
 import type { Provider, AuthError, User, Session } from '@supabase/supabase-js';
 
 // ─── Types ───────────────────────────────────────────────────
@@ -70,12 +70,29 @@ export async function signInWithOAuth(provider: Provider): Promise<AuthResult> {
 
 /** Send a password reset email to the user. */
 export async function resetPassword(email: string): Promise<AuthResult> {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}`,
-    });
+    if (!isSupabaseConfigured) {
+        return {
+            success: false,
+            error: 'Supabase auth is not configured. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+        };
+    }
 
-    if (error) return { success: false, error: error.message };
-    return { success: true };
+    try {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}`,
+        });
+
+        if (error) return { success: false, error: error.message };
+        return { success: true };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to reach Supabase auth.';
+        return {
+            success: false,
+            error: message === 'Failed to fetch'
+                ? 'Unable to reach Supabase. Check that your Supabase project URL is correct, the project is active, and your network/DNS is not blocking it.'
+                : message,
+        };
+    }
 }
 
 /** Update the currently authenticated user's password (used after PASSWORD_RECOVERY). */

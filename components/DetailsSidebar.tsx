@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Activity, PlaceDetails } from '../types';
 import { getPlaceDetails } from '../services/placesService';
+import { getApiBaseUrl } from '../services/apiBase';
 
 interface DetailsSidebarProps {
     activity: Activity;
@@ -25,7 +26,7 @@ const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFa
     };
 
 
-    const baseUrl = import.meta.env.DEV ? 'http://localhost:5050' : '';
+    const baseUrl = getApiBaseUrl();
 
     useEffect(() => {
         let isMounted = true;

@@ -1,4 +1,5 @@
 import type { Activity } from '../types/planner';
+import { getApiBaseUrl } from './apiBase';
 
 interface DiscoverPlannerActivitiesResponse {
   activities?: Activity[];
@@ -10,7 +11,7 @@ export async function discoverPlannerActivities(params: {
   lng: number;
   radiusMeters?: number;
 }): Promise<Activity[]> {
-  const baseUrl = import.meta.env.DEV ? 'http://localhost:5050' : '';
+  const baseUrl = getApiBaseUrl();
 
   const response = await fetch(`${baseUrl}/api/planner/discover`, {
     method: 'POST',

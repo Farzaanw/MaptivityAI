@@ -1,4 +1,5 @@
 import { Activity } from '../types';
+import { getApiBaseUrl } from './apiBase';
 
 interface PlaceResponse {
   id: string;
@@ -53,7 +54,7 @@ export async function searchNearbyActivities(params: {
     radius: String(radiusMeters),
     q: query,
   });
-  const baseUrl = import.meta.env.DEV ? 'http://localhost:5050' : '';
+  const baseUrl = getApiBaseUrl();
 
   try {
     const res = await fetch(`${baseUrl}/api/places/nearby?${searchParams}`);
@@ -103,7 +104,7 @@ export async function searchNearbyActivities(params: {
 }
 
 export async function getPlaceDetails(placeId: string): Promise<any> {
-  const baseUrl = import.meta.env.DEV ? 'http://localhost:5050' : '';
+  const baseUrl = getApiBaseUrl();
   try {
     const res = await fetch(`${baseUrl}/api/places/details/${placeId}`);
     if (!res.ok) throw new Error(`Place details error: ${res.status}`);

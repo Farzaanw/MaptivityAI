@@ -1,4 +1,5 @@
 import type { MappedActivity, MarkerData, PlannerMarkerRequest } from '../types/planner';
+import { getApiBaseUrl } from './apiBase';
 
 interface PlannerMarkerResolution {
   id: string;
@@ -9,7 +10,7 @@ interface PlannerMarkerResolution {
 async function resolveMarkers(
   requests: PlannerMarkerRequest[],
 ): Promise<Map<string, PlannerMarkerResolution>> {
-  const baseUrl = import.meta.env.DEV ? 'http://localhost:5050' : '';
+  const baseUrl = getApiBaseUrl();
 
   const response = await fetch(`${baseUrl}/api/planner/markers`, {
     method: 'POST',

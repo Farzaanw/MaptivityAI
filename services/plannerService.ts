@@ -5,6 +5,7 @@ import type {
   PlannerResponse,
   PlannerResponsePlan,
 } from '../types/planner';
+import { getApiBaseUrl } from './apiBase';
 
 function inferDayNumber(time: string, fallbackDays: number): number {
   const match = time.match(/day\s*(\d+)/i);
@@ -53,7 +54,7 @@ function normalizePlan(plan: PlannerResponsePlan): GeneratedPlan {
 }
 
 export async function generateItinerary(prompt: string): Promise<GeneratedPlan[]> {
-  const baseUrl = import.meta.env.DEV ? 'http://localhost:5050' : '';
+  const baseUrl = getApiBaseUrl();
 
   const response = await fetch(`${baseUrl}/api/planner/itinerary`, {
     method: 'POST',
