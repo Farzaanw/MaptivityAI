@@ -280,9 +280,18 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
   };
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto bg-[radial-gradient(circle_at_top_left,_rgba(186,230,253,0.55),_transparent_32%),linear-gradient(180deg,#f8fbff_0%,#eef4ff_50%,#f8fafc_100%)] px-6 py-10 sm:px-10">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
-        <section className="rounded-[36px] border border-sky-100 bg-white/85 p-8 shadow-[0_24px_80px_rgba(14,116,144,0.12)] backdrop-blur">
+    <div className="relative flex-1 min-h-0 overflow-hidden bg-slate-50">
+      {/* Moving Background Glow Concept */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.2),_transparent_50%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.2),_transparent_50%)]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150vmax] h-[150vmax] opacity-[0.4]">
+          <div className="w-full h-full animate-[spin_15s_linear_infinite] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(14,165,233,0.8)_90deg,rgba(59,130,246,0.8)_180deg,rgba(79,70,229,0.8)_270deg,transparent_360deg)] blur-[120px]" />
+        </div>
+      </div>
+
+      <div className="relative z-10 h-full overflow-y-auto px-6 py-10 sm:px-10">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
+          <section className="rounded-[36px] border border-sky-100 bg-white/85 p-8 shadow-[0_24px_80px_rgba(14,116,144,0.12)] backdrop-blur transition-all duration-500 animate-float hover:animate-none">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="inline-flex items-center rounded-full bg-sky-100 px-4 py-3 text-sm font-bold uppercase tracking-[0.1em] text-sky-700">
               Generate Plan
@@ -633,6 +642,7 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
           </aside>
         </div>
       </div>
+    </div>
     </div>
   );
 };

@@ -101,7 +101,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       <button
         type="button"
         onClick={toggle}
-        className="absolute -left-12 top-24 bg-indigo-600 text-white py-3 px-2.5 rounded-l-2xl shadow-[0_8px_30px_rgb(79,70,229,0.4)] border border-r-0 border-indigo-500 hover:bg-indigo-700 hover:pr-3 hover:-left-[3.25rem] transition-all duration-300 pointer-events-auto z-50 group flex items-center justify-center"
+        className="absolute -left-12 top-24 bg-indigo-600 text-white py-3 px-2.5 rounded-l-2xl shadow-[0_8px_30px_rgb(79,70,229,0.4)] border border-r-0 border-indigo-500 hover:bg-indigo-700 hover:pr-3 hover:-left-[3.25rem] transition-all duration-300 pointer-events-auto z-50 group flex items-center justify-center animate-float"
         aria-label={isOpen ? "Close sidebar" : "Open sidebar"}
       >
         <svg

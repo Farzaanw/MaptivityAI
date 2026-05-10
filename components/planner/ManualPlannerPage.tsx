@@ -774,9 +774,18 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
   };
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(251,191,36,0.16),_transparent_28%),linear-gradient(180deg,#fbfdff_0%,#eefbf6_52%,#f8fafc_100%)] px-6 py-10 sm:px-10">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
-        <section className="rounded-[36px] border border-white/60 bg-white/80 p-8 shadow-[0_24px_80px_rgba(15,23,42,0.1)] backdrop-blur">
+    <div className="relative flex-1 min-h-0 overflow-hidden bg-slate-50">
+      {/* Moving Background Glow Concept */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.2),_transparent_50%),radial-gradient(circle_at_bottom_right,_rgba(251,191,36,0.2),_transparent_50%)]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150vmax] h-[150vmax] opacity-[0.4]">
+          <div className="w-full h-full animate-[spin_15s_linear_infinite] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(16,185,129,0.8)_90deg,rgba(251,191,36,0.8)_180deg,rgba(79,70,229,0.8)_270deg,transparent_360deg)] blur-[120px]" />
+        </div>
+      </div>
+
+      <div className="relative z-10 h-full overflow-y-auto px-6 py-10 sm:px-10">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
+          <section className="rounded-[36px] border border-white/60 bg-white/80 p-8 shadow-[0_24px_80px_rgba(15,23,42,0.1)] backdrop-blur transition-all duration-500 animate-float hover:animate-none">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="inline-flex items-center rounded-full bg-emerald-100 px-4 py-1 text-sm font-bold uppercase tracking-[0.1em] text-emerald-700">
               Build Your Own
@@ -1244,6 +1253,7 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
           </DragOverlay>
         </DndContext>
       </div>
+    </div>
     </div>
   );
 };
