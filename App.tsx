@@ -831,7 +831,9 @@ const App: React.FC = () => {
                     />
                   </svg>
                   {!startTickerLocation
-                    ? 'Set Search Area'
+                    ? isAreaSelectionMode
+                      ? 'Click on Map'
+                      : 'Set Search Area'
                     : !isRegionDirty && isRegionLocked
                       ? 'Adjust Region'
                       : 'Search This Area'}

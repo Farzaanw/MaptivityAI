@@ -103,13 +103,14 @@ Steps:
 3. Create Credentials -> API Key
 4. Rename to: Maptivity_Frontend_Key
 
+API restrictions (enable these):
+1. Maps JavaScript API
+2. Places API (New)
+3. Geocoding API 
+
 Application restrictions:
 - For local development: Select "None"
 - For production: Select "IP addresses" and add your server IP
-
-API restrictions (enable these):
-- Maps JavaScript API
-- Places API (New)
 
 Add to root .env file in project root:
 

@@ -53,6 +53,24 @@ const NON_RESTAURANT_FOOD_TYPES = new Set([
   'market',
 ]);
 
+const STRICT_ACTIVITY_TYPES = new Set([
+  'amusement_park',
+  'aquarium',
+  'art_gallery',
+  'bowling_alley',
+  'casino',
+  'movie_theater',
+  'night_club',
+  'shopping_mall',
+  'zoo',
+  'amusement_center',
+  'performing_arts_theater',
+  'golf_course',
+  'swimming_pool',
+  'campground',
+  'marina'
+]);
+
 function inferCategory(types: string[] = []): Activity['category'] {
   const t = types.map((x) => x.toLowerCase());
 
@@ -61,10 +79,15 @@ function inferCategory(types: string[] = []): Activity['category'] {
   const hasRestaurantType = t.some((x) => STRICT_FOOD_TYPES.has(x) || x.endsWith('_restaurant'));
   if (!hasNonRestaurantFoodType && hasRestaurantType) return 'food';
 
-  // Places (Nature/Parks/Landmarks) bucket
-  if (t.some((x) => ['park', 'natural_feature', 'beach', 'garden', 'lake', 'landmark', 'tourist_attraction'].some((k) => x.includes(k)))) return 'places';
-  // Activities (Entertainment/Shopping/Culture) bucket
-  return 'activities';
+  // Explicitly exclude gyms and fitness centers from activities
+  // (Even if they have a swimming_pool tag, they belong in places)
+  if (t.some((x) => ['gym', 'fitness_center', 'health'].some(k => x.includes(k)))) return 'places';
+
+  // Strict activities bucket
+  if (t.some((x) => STRICT_ACTIVITY_TYPES.has(x))) return 'activities';
+
+  // Places (Nature/Parks/Landmarks) bucket and fallback
+  return 'places';
 }
 
 export async function searchNearbyActivities(params: {
