@@ -248,140 +248,145 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, onSet
   };
 
   return (
-    <div
-      className={`absolute top-4 left-4 bg-white rounded-lg z-30 flex flex-col gap-4 animate-in fade-in slide-in-from-left-4 duration-200 transition-all overflow-y-auto ${isMinimized ? 'w-90 h-14 p-3' : selectedLocation ? 'w-96 max-h-screen p-6' : 'w-96 h-96 p-6'
-        }`}
-      style={{
-        boxShadow: 'inset 0 0 20px rgba(59, 130, 246, 0.2), 0 0 40px rgba(59, 130, 246, 0.5), 0 8px 24px rgba(0, 0, 0, 0.15)'
-      }}
-    >
-      <div
-        className="flex justify-between items-center cursor-pointer"
-        onClick={() => isMinimized && onMinimizedChange(false)}
-      >
-        <h2 className="text-lg font-bold text-gray-800">Search Location</h2>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onMinimizedChange(!isMinimized);
-          }}
-          className="text-gray-500 hover:text-gray-700 transition-colors"
-          title={isMinimized ? 'Expand' : 'Minimize'}
-        >
-          {isMinimized ? (
+    <div className={`absolute top-4 left-4 z-30 flex flex-col gap-3 animate-in fade-in slide-in-from-left-4 duration-300 transition-all ${isMinimized ? 'w-[480px]' : 'w-[580px]'}`}>
+      
+      {/* 1. AIRBNB FLOATING PILL WITH STATIONARY RING & CIRCULATING LIGHT */}
+      <div className="relative group rounded-full">
+        {/* Base Static Glow */}
+        <div className="absolute -inset-[2px] rounded-full blur-md opacity-30 bg-gradient-to-r from-blue-500 via-emerald-400 to-indigo-500 transition-opacity duration-500 group-hover:opacity-60"></div>
+
+        {/* External Circulating Bright Glow */}
+        <div className="absolute -inset-[4px] rounded-full blur-xl opacity-70 transition-opacity duration-500 overflow-hidden mix-blend-screen">
+            <div className="absolute top-1/2 left-1/2 w-[200%] h-[200%] -translate-x-1/2 -translate-y-1/2 animate-[spin_3s_linear_infinite] bg-[conic-gradient(transparent_0%,transparent_75%,rgba(255,255,255,0.9)_95%,transparent_100%)]"></div>
+        </div>
+
+        {/* The Pill Wrapper */}
+        <div className="relative rounded-full p-[10px] bg-white overflow-hidden shadow-2xl">
+           {/* 1. Stationary Ring Gradient */}
+           <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-emerald-400 to-indigo-500"></div>
+
+           {/* 2. Circulating Light Highlight */}
+           <div className="absolute top-1/2 left-1/2 w-[200%] h-[200%] -translate-x-1/2 -translate-y-1/2 animate-[spin_3s_linear_infinite] bg-[conic-gradient(transparent_0%,transparent_80%,rgba(255,255,255,0.8)_95%,transparent_100%)]"></div>
+           
+           <div 
+             className="relative bg-white rounded-full flex items-center px-3 py-3 cursor-text transition-all duration-300 w-full h-full"
+             onClick={() => isMinimized && onMinimizedChange(false)}
+           >
+             <div className="pl-5 pr-3 text-gray-800 font-bold text-[15px] tracking-wide whitespace-nowrap">
+               Where to?
+             </div>
+        
+        <div className="h-6 w-px bg-gray-200 mx-2"></div>
+
+        <input
+          ref={inputRef}
+          type="text"
+          value={inputValue}
+          onChange={(e) => handleInputChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={() => isMinimized && onMinimizedChange(false)}
+          placeholder="Search destinations"
+          className="flex-1 bg-transparent border-none focus:outline-none text-gray-800 placeholder-gray-400 text-[15px] truncate"
+        />
+
+        {loading ? (
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 ml-2 shrink-0">
+            <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+          </div>
+        ) : inputValue ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedLocation(null);
+              onInputChange("");
+              setSuggestions([]);
+            }}
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors ml-2 shrink-0"
+            title="Clear"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 10a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2z" clipRule="evenodd" />
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
             </svg>
-          ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm16 2v10a4 4 0 01-4 4H4v-2a2 2 0 012-2h10a2 2 0 012-2h4V5z" clipRule="evenodd" />
-            </svg>
-          )}
-        </button>
+          </button>
+        ) : (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (suggestions.length > 0) {
+                handleSuggestionClick(suggestions[0]);
+              } else {
+                onMinimizedChange(!isMinimized);
+              }
+            }}
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md transition-colors ml-2 shrink-0"
+          >
+            {isMinimized ? (
+               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                 <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+               </svg>
+            ) : (
+               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                 <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+               </svg>
+            )}
+          </button>
+        )}
+        </div>
+      </div>
       </div>
 
+      {/* 2. EXPANDED DROPDOWN / DETAILS CARD */}
       {!isMinimized && (
-        <div className="flex-1 flex flex-col gap-3 overflow-hidden">
-          <div className="relative">
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputValue}
-              onChange={(e) => handleInputChange(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Find a location..."
-              className="w-full px-4 py-2 pr-20 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:italic placeholder:text-gray-400/60"
-
-            />
-            {loading && (
-              <div className="absolute right-14 top-2.5">
-                <div className="animate-spin h-5 w-5 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
-              </div>
-            )}
-            {!loading && inputValue && (
-              <div className="absolute right-3 top-2.5 flex gap-2">
-                {/* Magnifying glass icon - search button */}
-                <button
-                  onClick={() => suggestions.length > 0 && handleSuggestionClick(suggestions[0])}
-                  disabled={suggestions.length === 0}
-                  className="text-gray-400 hover:text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  title="Search"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                  </svg>
-                </button>
-                {/* X icon - clear button */}
-                <button
-                  onClick={() => {
-                    // Clear everything and show history
-                    setSelectedLocation(null);
-                    onInputChange("");
-                    setSuggestions([]);
-                  }}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                  title="Clear"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Suggestions dropdown - appears right below search bar above location details when location is selected */}
+        <div 
+          className="bg-white rounded-3xl flex flex-col overflow-hidden"
+          style={{ 
+            boxShadow: '0 12px 40px rgba(0,0,0,0.12)',
+            maxHeight: 'calc(100vh - 120px)'
+          }}
+        >
+          {/* Suggestions List */}
           {suggestions.length > 0 && (
-            <div className={`overflow-y-auto bg-gray-50 rounded-lg border border-gray-200 ${selectedLocation ? 'absolute top-28 left-6 right-6 z-50 max-h-96 shadow-xl' : 'flex-1'
-              }`}>
+            <div className="overflow-y-auto w-full max-h-96 py-2">
               {suggestions.map((suggestion, index) => (
                 <button
                   key={index}
                   onClick={() => handleSuggestionClick(suggestion)}
-                  className="w-full text-left px-4 py-3 hover:bg-indigo-50 border-b border-gray-200 last:border-b-0 transition-colors"
+                  className="w-full text-left px-6 py-3 hover:bg-gray-50 flex flex-col transition-colors"
                 >
-                  {/* <div className="font-medium text-gray-800 text-sm">{suggestion.main_text || suggestion.mainText || suggestion.description}</div> */}
-                  {/* New API uses 'placePrediction', Legacy used 'description' */}
-                  <div className="font-medium text-gray-800 text-sm">
+                  <div className="font-semibold text-gray-800 text-[15px]">
                     {suggestion.placePrediction?.text?.text ?? "Unknown location"}
                   </div>
-
-                  <div className="text-gray-500 text-xs">{suggestion.secondary_text || suggestion.secondaryText}</div>
+                  <div className="text-gray-500 text-[13px] mt-0.5">{suggestion.secondary_text || suggestion.secondaryText}</div>
                 </button>
               ))}
             </div>
           )}
 
           {inputValue.length > 0 && suggestions.length === 0 && !loading && !selectedLocation && (
-            <div className="text-center text-gray-500 text-sm py-4">
+            <div className="text-center text-gray-500 text-[15px] py-8">
               No locations found
             </div>
           )}
 
-          {/* Search History - Show when no input or no suggestions */}
+          {/* Search History */}
           {!inputValue && searchHistory.length > 0 && !selectedLocation && (
-            <div className="flex-1 overflow-y-auto bg-gray-50 rounded-lg border border-gray-200">
-              {/* <div className="px-4 py-2 border-b border-gray-200 sticky top-0 bg-gray-50">
-              <p className="text-xs font-semibold text-gray-600">Recent Searches</p>
-            </div> */}
+            <div className="flex-1 overflow-y-auto py-2">
+              <div className="px-6 py-3 flex justify-between items-center">
+                <h3 className="text-sm font-bold text-gray-900">Recent Searches</h3>
+              </div>
               {searchHistory.map((item, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between px-4 py-3 hover:bg-indigo-50 border-b border-gray-200 last:border-b-0 transition-colors group"
+                  className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors group"
                 >
                   <button
                     onClick={async () => {
-                      // Reconstruct location object and select it
                       const bounds: [[number, number], [number, number]] = [
                         [item.lat - 0.01, item.lng - 0.01],
                         [item.lat + 0.01, item.lng + 0.01],
                       ];
-
                       onLocationSelect(item.lat, item.lng, item.name, bounds);
-
-                      // Fetch image from Unsplash
                       const imageUrl = await getLocationImage(item.name);
-
                       setSelectedLocation({
                         name: item.name,
                         lat: item.lat,
@@ -392,14 +397,20 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, onSet
                         address: item.address,
                         editorialSummary: null,
                       });
-
                       onInputChange(item.name);
                       setSuggestions([]);
                     }}
-                    className="flex-1 text-left"
+                    className="flex-1 text-left flex items-center gap-3"
                   >
-                    <div className="font-medium text-gray-800 text-sm">{item.name}</div>
-                    <div className="text-gray-500 text-xs">{item.address}</div>
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 text-gray-500">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-800 text-[15px]">{item.name}</div>
+                      <div className="text-gray-500 text-[13px] line-clamp-1">{item.address}</div>
+                    </div>
                   </button>
                   <button
                     onClick={(e) => {
@@ -408,116 +419,106 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onLocationSelect, onSet
                       setSearchHistory(updatedHistory);
                       localStorage.setItem('maptivitySearchHistory', JSON.stringify(updatedHistory));
                     }}
-                    className="ml-2 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                    className="ml-2 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100"
                     title="Delete this location from history"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                     </svg>
                   </button>
                 </div>
               ))}
               {searchHistory.length > 0 && (
-                <button
-                  onClick={() => {
-                    setSearchHistory([]);
-                    localStorage.removeItem('maptivitySearchHistory');
-                  }}
-                  className="w-full px-4 py-2 text-xs text-gray-500 hover:text-red-600 transition-colors border-t"
-                >
-                  Clear History
-                </button>
+                <div className="px-6 py-4 mt-2 border-t border-gray-100">
+                  <button
+                    onClick={() => {
+                      setSearchHistory([]);
+                      localStorage.removeItem('maptivitySearchHistory');
+                    }}
+                    className="text-sm font-bold text-gray-500 hover:text-red-600 transition-colors underline decoration-transparent hover:decoration-red-600 underline-offset-4"
+                  >
+                    Clear History
+                  </button>
+                </div>
               )}
             </div>
           )}
-        </div>
-      )}
 
-      {/* Location Details Section */}
-      {selectedLocation && !isMinimized && (
-        <div className="flex flex-col overflow-y-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
-          {/* Banner Image - Only show if image exists */}
-          {selectedLocation.photos && selectedLocation.photos.length > 0 && selectedLocation.photos[0] && (
-            <div className="w-[calc(100%-12px)] h-52 bg-gray-300 flex items-center justify-center overflow-hidden rounded-2xl mb-4 mx-1.5 mt-4">
-              <img
-                src={selectedLocation.photos[0]}
-                alt={selectedLocation.name}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  console.error('Photo load error:', e);
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-            </div>
-          )}
+          {/* Location Details Section */}
+          {selectedLocation && (
+            <div className="flex flex-col overflow-y-auto pb-6">
+              {/* Banner Image */}
+              {selectedLocation.photos && selectedLocation.photos.length > 0 && selectedLocation.photos[0] ? (
+                <div className="w-full h-56 bg-gray-100 overflow-hidden relative">
+                  <img
+                    src={selectedLocation.photos[0]}
+                    alt={selectedLocation.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+                  
+                  <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                    {(() => {
+                      const addressParts = selectedLocation.address ? selectedLocation.address.split(',').map((s: string) => s.trim()) : [];
+                      const cityState = addressParts.slice(0, -1).join(', ') || selectedLocation.name;
+                      const country = addressParts.slice(-1)[0] || '';
+                      return (
+                        <>
+                          <h2 className="text-3xl font-bold mb-1 drop-shadow-md">{cityState}</h2>
+                          <p className="text-sm font-medium text-white/90 drop-shadow-md">{country}</p>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              ) : (
+                <div className="px-6 pt-8 pb-4 bg-gradient-to-br from-indigo-50 to-white">
+                  {(() => {
+                    const addressParts = selectedLocation.address ? selectedLocation.address.split(',').map((s: string) => s.trim()) : [];
+                    const cityState = addressParts.slice(0, -1).join(', ') || selectedLocation.name;
+                    const country = addressParts.slice(-1)[0] || '';
+                    return (
+                      <>
+                        <h2 className="text-3xl font-bold text-gray-900 mb-1">{cityState}</h2>
+                        <p className="text-sm font-medium text-gray-500">{country}</p>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
 
-          {/* Place Identity Section - Add top padding if no image */}
-          <div className={`px-4 pb-4 border-b border-gray-200 ${!selectedLocation.photos || selectedLocation.photos.length === 0 || !selectedLocation.photos[0] ? 'pt-4' : ''}`}>
-            {(() => {
-              const addressParts = selectedLocation.address ? selectedLocation.address.split(',').map((s: string) => s.trim()) : [];
-              const cityState = addressParts.slice(0, -1).join(', ');
-              const country = addressParts.slice(-1)[0];
-
-              return (
-                <>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-1">{cityState}</h2>
-                  <p className="text-sm text-gray-400">{country}</p>
-                </>
-              );
-            })()}
-          </div>
-
-          {/* Quick Facts Section
-          <div className="px-4 py-4 border-b border-gray-200">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Quick Facts</h3>
-            <p className="text-gray-700 text-sm leading-relaxed">
-              {selectedLocation.editorialSummary || `${selectedLocation.name} is a vibrant destination with diverse attractions, dining options, and cultural experiences. Visit to explore local landmarks, enjoy cuisine, and create memorable moments.`}
-            </p>
-          </div> */}
-
-          {/* Most Popular Destinations Section */}
-          <div className="px-4 py-4 border-b border-gray-200">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Most Popular Destinations</h3>
-            <p className="text-gray-600 text-xs">Coming soon - Nearby attractions and restaurants</p>
-          </div>
-
-          {/* Additional Details */}
-          {selectedLocation.rating && (
-            <div className="px-4 py-4 border-b border-gray-200">
-              <div className="flex items-center gap-2">
-                <div className="flex">
-                  {[...Array(5)].map((_, i) => (
-                    <svg
-                      key={i}
-                      className={`w-4 h-4 ${i < Math.round(selectedLocation.rating) ? 'text-yellow-400' : 'text-gray-300'}`}
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
+              {/* Stats Bar */}
+              {selectedLocation.rating && (
+                <div className="px-6 py-4 flex items-center gap-6 border-b border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                     </svg>
-                  ))}
+                    <span className="text-base font-bold text-gray-900">{selectedLocation.rating.toFixed(1)}</span>
+                    {selectedLocation.userRatingCount && (
+                      <span className="text-sm font-medium text-gray-500">({selectedLocation.userRatingCount.toLocaleString()} reviews)</span>
+                    )}
+                  </div>
                 </div>
-                <span className="text-sm font-semibold text-gray-800">{selectedLocation.rating.toFixed(1)}</span>
-                {selectedLocation.userRatingCount && (
-                  <span className="text-xs text-gray-600">({selectedLocation.userRatingCount.toLocaleString()})</span>
-                )}
+              )}
+
+              {/* Set as Start Location Button */}
+              <div className="px-6 py-6">
+                <button
+                  onClick={() => {
+                    onSetAsStartLocation(selectedLocation.lat, selectedLocation.lng, selectedLocation.name);
+                    onMinimizedChange(true);
+                  }}
+                  className="w-full px-4 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[15px] rounded-xl transform hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-indigo-600/20"
+                >
+                  Set Search Origin
+                </button>
               </div>
             </div>
           )}
-
-          {/* Set as Start Location Button */}
-          <div className="px-4 py-4">
-            <button
-              onClick={() => {
-                onSetAsStartLocation(selectedLocation.lat, selectedLocation.lng, selectedLocation.name);
-                onMinimizedChange(true);
-              }}
-              className="w-full px-4 py-3 bg-red-400 hover:bg-red-500 text-white font-semibold rounded-lg transform hover:scale-105 active:scale-95 transition-all shadow-md"
-              title="Set this location as your search start point and begin finding activities"
-            >
-              Set as Start Location
-            </button>
-          </div>
         </div>
       )}
     </div>

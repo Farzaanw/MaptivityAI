@@ -17,7 +17,23 @@ export default {
     "./**/*.ts",
   ],
   theme: {
-    extend: {},
+    extend: {
+      keyframes: {
+        'gradient-xy': {
+          '0%, 100%': {
+            'background-size': '200% 200%',
+            'background-position': '0% 50%'
+          },
+          '50%': {
+            'background-size': '200% 200%',
+            'background-position': '100% 50%'
+          }
+        }
+      },
+      animation: {
+        'gradient-xy': 'gradient-xy 4s ease infinite',
+      }
+    },
   },
   plugins: [],
 }
