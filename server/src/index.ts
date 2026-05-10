@@ -46,14 +46,24 @@ const PLACE_DETAILS_FIELDS =
 
 const GENERIC_QUERIES = ['things to do', 'fun things to do', ''];
 
+// By splitting these into a balanced 5 arrays, we get better density than 
+// a single bucket, without making too many expensive API calls.
 const NEARBY_TYPE_BUCKETS: string[][] = [
-  ['restaurant', 'cafe', 'bar', 'bakery', 'ice_cream_shop'],
-  ['museum', 'art_gallery', 'tourist_attraction', 'zoo', 'aquarium', 'marina'],
-  ['park', 'beach', 'garden', 'lake', 'golf_course', 'hiking_area'],
-  ['movie_theater', 'stadium', 'shopping_mall', 'casino', 'bowling_alley', 'spa', 'gym'],
+  // Food & Drink (Restaurants separated to prevent them from crowding out cafes/bars)
+  ['restaurant'],
+  ['cafe', 'bakery', 'bar', 'ice_cream_shop'],
+
+  // Arts & Culture
+  ['tourist_attraction', 'museum', 'art_gallery'],
+  
+  // Nature & Outdoors
+  ['park', 'beach', 'garden', 'zoo', 'aquarium', 'hiking_area'],
+  
+  // Entertainment & Recreation
+  ['movie_theater', 'stadium', 'shopping_mall', 'spa', 'bowling_alley', 'gym'],
 ];
 
-const MAX_MERGED_RESULTS = 80;
+const MAX_MERGED_RESULTS = 150;    // MAIN LIMIT FOR TOTAL SEARCH RESULTS
 
 const EXCLUDED_PLACE_TYPES = new Set([
   'supermarket',

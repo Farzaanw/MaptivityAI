@@ -96,28 +96,46 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, [isResizing, setWidth, setIsResizing]);
 
   return (
-    <div className={`absolute top-0 right-0 h-full z-40 transition-all duration-300 ease-in-out ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
-      {/* Toggle Button - Moved outside overflow-hidden of the main content column */}
+    <div className={`absolute top-3 right-4 h-[calc(100vh-85px)] z-40 transition-all duration-300 ease-in-out ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+      {/* Toggle Button */}
       <button
         type="button"
         onClick={toggle}
-        className="absolute -left-10 top-20 bg-white p-2 rounded-l-xl shadow-md border-y border-l border-gray-200 hover:text-indigo-600 transition-all duration-300 pointer-events-auto"
+        className="absolute -left-12 top-24 bg-indigo-600 text-white py-3 px-2.5 rounded-l-2xl shadow-[0_8px_30px_rgb(79,70,229,0.4)] border border-r-0 border-indigo-500 hover:bg-indigo-700 hover:pr-3 hover:-left-[3.25rem] transition-all duration-300 pointer-events-auto z-50 group flex items-center justify-center"
         aria-label={isOpen ? "Close sidebar" : "Open sidebar"}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className={`h-6 w-6 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
-          fill="none" viewBox="0 0 24 24" stroke="currentColor"
+          className={`h-5 w-5 font-bold transition-transform duration-300 group-hover:scale-110 ${isOpen ? 'rotate-180' : ''}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
         </svg>
       </button>
 
-      <div
-        className={`h-full bg-white/95 backdrop-blur-lg shadow-2xl flex flex-col ${isOpen ? 'sm:block' : 'hidden'
-          } ${!isResizing ? 'transition-all duration-300 ease-in-out' : ''}`}
+      {/* 1. AIRBNB FLOATING PILL WITH STATIONARY RING & CIRCULATING LIGHT */}
+      <div 
+        className={`relative group h-full rounded-[2.5rem] ${isOpen ? 'sm:block' : 'hidden'} ${!isResizing ? 'transition-all duration-300 ease-in-out' : ''}`}
         style={window.innerWidth >= 640 ? { width: `${width}px` } : { width: '100vw' }}
       >
+        {/* Base Static Glow */}
+        <div className="absolute -inset-[2px] rounded-[2.5rem] blur-md opacity-30 bg-gradient-to-r from-blue-500 via-emerald-400 to-indigo-500 transition-opacity duration-500 group-hover:opacity-60 pointer-events-none"></div>
+
+        {/* External Circulating Bright Glow */}
+        <div className="absolute -inset-[4px] rounded-[2.5rem] blur-xl opacity-70 transition-opacity duration-500 overflow-hidden mix-blend-screen pointer-events-none">
+            <div className="absolute top-1/2 left-1/2 w-[200%] h-[200%] -translate-x-1/2 -translate-y-1/2 animate-[spin_3s_linear_infinite] bg-[conic-gradient(transparent_0%,transparent_75%,rgba(255,255,255,0.9)_95%,transparent_100%)]"></div>
+        </div>
+
+        {/* The Pill Wrapper */}
+        <div className="relative rounded-[2.5rem] p-[4px] bg-white overflow-hidden shadow-2xl h-full flex flex-col">
+           {/* 1. Stationary Ring Gradient */}
+           <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-emerald-400 to-indigo-500"></div>
+
+           {/* 2. Circulating Light Highlight */}
+           <div className="absolute top-1/2 left-1/2 w-[200%] h-[200%] -translate-x-1/2 -translate-y-1/2 animate-[spin_3s_linear_infinite] bg-[conic-gradient(transparent_0%,transparent_80%,rgba(255,255,255,0.8)_95%,transparent_100%)]"></div>
+           
+           {/* Inner Content Container */}
+           <div className="relative bg-white/95 backdrop-blur-lg rounded-[2.3rem] flex flex-col h-full w-full overflow-hidden">
         {/* Resize Handle (Left edge) */}
         {isOpen && (
           <div
@@ -219,6 +237,8 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
         )}
+          </div>
+        </div>
       </div>
     </div>
   );
