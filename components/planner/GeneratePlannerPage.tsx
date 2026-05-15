@@ -52,16 +52,16 @@ function buildSavedGeneratedPlan(plan: GeneratedPlan, prompt: string): SavedPlan
 }
 
 const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, onPrepareReservationDraft, onSavePlan }) => {
-    // Mic button voice-to-text state
-    const [isRecording, setIsRecording] = useState(false);
-    const [micError, setMicError] = useState<string | null>(null);
-    const recognitionRef = useRef<any>(null);
-    const supportsSpeechRecognition = typeof window !== 'undefined' && (
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    );
-    const [tripDescription, setTripDescription] = useState('');
-    const finalVoiceTranscriptRef = useRef('');
-    const [finalVoiceTranscript, setFinalVoiceTranscript] = useState('');
+  // Mic button voice-to-text state
+  const [isRecording, setIsRecording] = useState(false);
+  const [micError, setMicError] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
+  const supportsSpeechRecognition = typeof window !== 'undefined' && (
+    (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+  );
+  const [tripDescription, setTripDescription] = useState('');
+  const finalVoiceTranscriptRef = useRef('');
+  const [finalVoiceTranscript, setFinalVoiceTranscript] = useState('');
   const [plans, setPlans] = useState<GeneratedPlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [mappedPlanId, setMappedPlanId] = useState<string | null>(null);
@@ -283,40 +283,39 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
     <div className="relative flex-1 min-h-0 overflow-hidden bg-slate-50">
       {/* Moving Background Glow Concept */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.2),_transparent_50%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.2),_transparent_50%)]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150vmax] h-[150vmax] opacity-[0.4]">
-          <div className="w-full h-full animate-[spin_15s_linear_infinite] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(14,165,233,0.8)_90deg,rgba(59,130,246,0.8)_180deg,rgba(79,70,229,0.8)_270deg,transparent_360deg)] blur-[120px]" />
-        </div>
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-emerald-400/20 via-sky-400/20 to-purple-400/20 animate-flowy-gradient bg-[length:200%_200%]"
+        />
       </div>
 
       <div className="relative z-10 h-full overflow-y-auto px-6 py-10 sm:px-10">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
           <section className="rounded-[36px] border border-sky-100 bg-white/85 p-8 shadow-[0_24px_80px_rgba(14,116,144,0.12)] backdrop-blur transition-all duration-500 animate-float hover:animate-none">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="inline-flex items-center rounded-full bg-sky-100 px-4 py-3 text-sm font-bold uppercase tracking-[0.1em] text-sky-700">
-              Generate Plan
-            </div>
-            <button
-              type="button"
-              onClick={() => onNavigate('/planner')}
-              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
-            >
-              Back to Planner Modes
-            </button>
-          </div>
-
-          <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
-            <div>
-              <h3 className="max-w-3xl text-4xl font-black tracking-tight text-slate-900">
-                Generate, Select, View, Plan
-              </h3>
-              <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
-                Describe the kind of trip your looking for and instantly get three thoughtfully crafted plans. 
-                Pick one, view the recommended daily itinerary, and interact with the map to explore the stops.
-              </p>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="inline-flex items-center rounded-full bg-sky-100 px-4 py-3 text-sm font-bold uppercase tracking-[0.1em] text-sky-700 animate-float shadow-lg">
+                Generate Plan
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigate('/planner')}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+              >
+                Back to Planner Modes
+              </button>
             </div>
 
-            {/* <div className="rounded-[28px] border border-sky-100 bg-sky-50/70 p-5">
+            <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
+              <div>
+                <h3 className="max-w-3xl text-4xl font-black tracking-tight text-slate-900">
+                  Generate, Select, View, Plan
+                </h3>
+                <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
+                  Describe the kind of trip your looking for and instantly get three thoughtfully crafted plans.
+                  Pick one, view the recommended daily itinerary, and interact with the map to explore the stops.
+                </p>
+              </div>
+
+              {/* <div className="rounded-[28px] border border-sky-100 bg-sky-50/70 p-5">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">Planner flow</p>
               <div className="mt-4 space-y-3 text-sm text-slate-600">
                 <p>1. Generate 3 plan options from your prompt</p>
@@ -324,61 +323,61 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
                 <p>3. Send that itinerary to the map as numbered stops</p>
               </div>
             </div> */}
-          </div>
+            </div>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-            <label className="block">
-              <span className="mb-3 block px-2 text-sm font-bold uppercase tracking-[0.1em] text-slate-500">
-                Describe your ideal trip
-              </span>
-              <div className="overflow-hidden rounded-[30px] border border-slate-700 bg-[#2e2e2e] shadow-[0_22px_60px_rgba(15,23,42,0.22)] transition focus-within:border-sky-400/70 focus-within:ring-4 focus-within:ring-sky-100">
-                <textarea
-                  value={tripDescription}
-                  onChange={(event) => setTripDescription(event.target.value)}
-                  className="min-h-[210px] w-full resize-none border-0 bg-transparent px-6 py-5 text-base leading-7 text-white outline-none placeholder:italic placeholder:text-slate-400"
-                  placeholder="Example: Plan a relaxed 3-day Seattle trip for two with coffee shops, waterfront walks, a museum, and one memorable dinner."
-                />
+            <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+              <label className="block">
+                <span className="mb-3 block px-2 text-sm font-bold uppercase tracking-[0.1em] text-slate-500">
+                  Describe your ideal trip
+                </span>
+                <div className="overflow-hidden rounded-[30px] border border-slate-700 bg-[#2e2e2e] shadow-[0_22px_60px_rgba(15,23,42,0.22)] transition focus-within:border-sky-400/70 focus-within:ring-4 focus-within:ring-sky-100">
+                  <textarea
+                    value={tripDescription}
+                    onChange={(event) => setTripDescription(event.target.value)}
+                    className="min-h-[210px] w-full resize-none border-0 bg-transparent px-6 py-5 text-base leading-7 text-white outline-none placeholder:italic placeholder:text-slate-400"
+                    placeholder="Example: Plan a relaxed 3-day Seattle trip for two with coffee shops, waterfront walks, a museum, and one memorable dinner."
+                  />
 
-                <div className="flex items-center justify-end px-5 pb-4">
-                  <div className="flex items-center gap-3">
-                    {supportsSpeechRecognition && (
-                      <button
-                        type="button"
-                        aria-label="Voice input"
-                        onClick={handleMicClick}
-                        className={`inline-flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/5 ${isRecording ? 'bg-red-600 text-white animate-pulse' : 'text-slate-300 hover:text-white'}`}
-                      >
-                        <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
-                          <path d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.92V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.08A7 7 0 0 1 5 12a1 1 0 1 1 2 0 5 5 0 1 0 10 0Z" />
-                        </svg>
-                      </button>
-                    )}
-                    <button
-                      type="submit"
-                      aria-label={isGenerating ? 'Generating plans' : 'Generate plans'}
-                      disabled={isGenerating}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-950 shadow-lg transition hover:scale-105 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {isGenerating ? (
-                        <svg viewBox="0 0 24 24" className="h-4 w-4 animate-spin fill-none stroke-current stroke-2" aria-hidden="true">
-                          <path d="M12 3a9 9 0 1 0 9 9" />
-                        </svg>
-                      ) : (
-                        <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
-                          <path d="M12 4a1 1 0 0 1 1 1v10.59l3.3-3.29a1 1 0 1 1 1.4 1.41l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 0 1 1.4-1.41L11 15.59V5a1 1 0 0 1 1-1Z" />
-                        </svg>
+                  <div className="flex items-center justify-end px-5 pb-4">
+                    <div className="flex items-center gap-3">
+                      {supportsSpeechRecognition && (
+                        <button
+                          type="button"
+                          aria-label="Voice input"
+                          onClick={handleMicClick}
+                          className={`inline-flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/5 ${isRecording ? 'bg-red-600 text-white animate-pulse' : 'text-slate-300 hover:text-white'}`}
+                        >
+                          <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
+                            <path d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.92V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.08A7 7 0 0 1 5 12a1 1 0 1 1 2 0 5 5 0 1 0 10 0Z" />
+                          </svg>
+                        </button>
                       )}
-                    </button>
+                      <button
+                        type="submit"
+                        aria-label={isGenerating ? 'Generating plans' : 'Generate plans'}
+                        disabled={isGenerating}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-950 shadow-lg transition hover:scale-105 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {isGenerating ? (
+                          <svg viewBox="0 0 24 24" className="h-4 w-4 animate-spin fill-none stroke-current stroke-2" aria-hidden="true">
+                            <path d="M12 3a9 9 0 1 0 9 9" />
+                          </svg>
+                        ) : (
+                          <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
+                            <path d="M12 4a1 1 0 0 1 1 1v10.59l3.3-3.29a1 1 0 1 1 1.4 1.41l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 0 1 1.4-1.41L11 15.59V5a1 1 0 0 1 1-1Z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </label>
+              </label>
 
-            {/* <p className="text-sm text-slate-500">
+              {/* <p className="text-sm text-slate-500">
               Structured itinerary options come back from your local Ollama `llama3` model.
             </p> */}
 
-            {/* <div className="flex flex-wrap gap-3 pt-1">
+              {/* <div className="flex flex-wrap gap-3 pt-1">
               <button
                 type="button"
                 onClick={handleReservePlan}
@@ -391,231 +390,225 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
                 Open a future booking queue for the currently selected itinerary.
               </p>
             </div> */}
-          </form>
+            </form>
 
-          {(error || micError) && (
-            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
-              {micError && <div>{micError}</div>}
-            </div>
-          )}
-        </section>
-
-        <section className="rounded-[32px] border border-slate-200 bg-white/85 p-6 shadow-[0_18px_70px_rgba(15,23,42,0.08)]">
-          <div className="mb-5 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-bold uppercase tracking-[0.1em] text-slate-500">Plan Options</p>
-              <h3 className="mt-2 text-2xl font-black text-slate-900">Choose a Direction</h3>
-            </div>
-            <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              {plans.length}/3 ready
-            </div>
-          </div>
-
-          {isGenerating ? (
-            <div className="flex flex-col items-center justify-center gap-4 py-6">
-              <Lottie
-                animationData={cyclistAnimation}
-                loop
-                autoplay
-                style={{ width: 320, height: 220 }}
-              />
-              <p className="text-sm font-semibold text-slate-500 tracking-wide animate-pulse">
-                Crafting your travel plans…
-              </p>
-            </div>
-          ) : plans.length > 0 ? (
-            <div className="grid gap-4 lg:grid-cols-3">
-              {plans.map((plan, index) => {
-                const isSelected = plan.id === selectedPlanId;
-                const isMapped = plan.id === mappedPlanId;
-
-                return (
-                  <div
-                    key={plan.id}
-                    onClick={() => handleSendToMap(plan)}
-                    className={`group cursor-pointer rounded-[26px] border p-5 transition-all duration-300 ${
-                      isMapped
-                        ? 'border-emerald-400 bg-emerald-50 shadow-[0_12px_36px_rgba(16,185,129,0.16)]'
-                        : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-slate-50 hover:shadow-lg'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] transition ${
-                        isMapped ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        Option {index + 1}
-                      </span>
-                      <span className="text-xs font-semibold text-slate-500">{plan.days} days</span>
-                    </div>
-
-                    <h4 className={`mt-4 text-xl font-black tracking-tight transition ${
-                      isMapped ? 'text-emerald-900' : 'text-slate-900'
-                    }`}>
-                      {plan.title}
-                    </h4>
-
-                    <p className="mt-3 text-sm leading-6 text-slate-600">{plan.summary}</p>
-
-                    <div className="mt-5 flex items-center justify-between text-xs text-slate-500">
-                      <span>{plan.activities.length} activities</span>
-                      <span className={`font-bold ${isMapped ? 'text-emerald-600' : ''}`}>
-                        {isMapped ? 'Currently Mapped' : 'Ready to map'}
-                      </span>
-                    </div>
-
-                    <div className="mt-5">
-                      <button
-                        type="button"
-                        className={`w-full rounded-full px-4 py-3 text-sm font-bold transition-all duration-300 pointer-events-none ${
-                          isMapped 
-                            ? 'bg-emerald-200 text-emerald-800' 
-                            : 'bg-slate-100 text-slate-500 group-hover:bg-sky-100 group-hover:text-sky-700'
-                        }`}
-                      >
-                        {isMapped ? 'Viewing Itinerary' : 'Click to View Itinerary'}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-12 text-center text-sm leading-7 text-slate-500">
-              Submit a trip description to generate three polished travel plan options.
-            </div>
-          )}
-        </section>
-
-        <div className="grid gap-8 pb-16 xl:grid-cols-[minmax(0,1.2fr)_420px]">
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-md px-3 py-1 font-bold uppercase tracking-[0.08em] text-slate-700">Map View</p>
-                <h3 className="mt-2 text-2xl font-black text-slate-900">
-                  {mappedPlan ? `${mappedPlan.title}` : ''}
-                </h3>
+            {(error || micError) && (
+              <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+                {micError && <div>{micError}</div>}
               </div>
-              <div className="flex gap-2">
-                {isGeocoding && (
-                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                    Geocoding stops...
-                  </span>
-                )}
-                {unresolvedMarkerCount > 0 && (
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                    {unresolvedMarkerCount} stop{unresolvedMarkerCount === 1 ? '' : 's'} need coordinates
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <PlannerMap
-              markers={geocodedMarkers}
-              hoveredActivityId={hoveredActivityId}
-              selectedActivityId={selectedActivityId}
-              onMarkerHoverChange={setHoveredActivityId}
-              onMarkerClick={handleSelectMappedActivity}
-            />
+            )}
           </section>
 
-          <aside className="mt-14 rounded-[32px] border border-slate-200 bg-slate-950 p-6 text-slate-100 shadow-[0_24px_80px_rgba(15,23,42,0.24)]">
+          <section className="rounded-[32px] border border-slate-200 bg-white/85 p-6 shadow-[0_18px_70px_rgba(15,23,42,0.08)]">
             <div className="mb-5 flex items-center justify-between">
               <div>
-                <p className="text-sm font-bold uppercase tracking-[0.1em] text-sky-300">Selected Itinerary</p>
-                {/* <h3 className="mt-2 text-2sm font-black">
-                  {selectedPlan ? selectedPlan.title : 'no plan selected'}
-                </h3> */}
+                <p className="text-sm font-bold uppercase tracking-[0.1em] text-slate-500">Plan Options</p>
+                <h3 className="mt-2 text-2xl font-black text-slate-900">Choose a Direction</h3>
               </div>
-              <div className="mt-0 rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-xs font-semibold text-sky-200">
-                {selectedPlan ? `${selectedPlan.days} days` : 'Awaiting plan'}
+              <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                {plans.length}/3 ready
               </div>
             </div>
 
-            {selectedPlan ? (
-              <div className="space-y-5">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-xl font-bold leading-7 text-slate-200">{selectedPlan.title}</p>
-                  <div className="mt-3 flex items-center gap-3 text-xs uppercase tracking-[0.14em] text-sky-200">
-                    <span>{selectedPlan.activities.length} total stops</span>
-                    <span>{mappedPlanId === selectedPlan.id ? 'Currently mapped' : 'Not mapped yet'}</span>
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={handleSavePlan}
-                      className="rounded-full bg-sky-500 px-7 py-5 text-sm font-black uppercase tracking-[0.14em] text-white transition hover:bg-sky-400"
+            {isGenerating ? (
+              <div className="flex flex-col items-center justify-center gap-4 py-6">
+                <Lottie
+                  animationData={cyclistAnimation}
+                  loop
+                  autoplay
+                  style={{ width: 320, height: 220 }}
+                />
+                <p className="text-sm font-semibold text-slate-500 tracking-wide animate-pulse">
+                  Crafting your travel plans…
+                </p>
+              </div>
+            ) : plans.length > 0 ? (
+              <div className="grid gap-4 lg:grid-cols-3">
+                {plans.map((plan, index) => {
+                  const isSelected = plan.id === selectedPlanId;
+                  const isMapped = plan.id === mappedPlanId;
+
+                  return (
+                    <div
+                      key={plan.id}
+                      onClick={() => handleSendToMap(plan)}
+                      className={`group cursor-pointer rounded-[26px] border p-5 transition-all duration-300 ${isMapped
+                          ? 'border-emerald-400 bg-emerald-50 shadow-[0_12px_36px_rgba(16,185,129,0.16)]'
+                          : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-slate-50 hover:shadow-lg'
+                        }`}
                     >
-                      Save to My Plans
-                    </button>
-                    {/* <button
+                      <div className="flex items-center justify-between">
+                        <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] transition ${isMapped ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                          Option {index + 1}
+                        </span>
+                        <span className="text-xs font-semibold text-slate-500">{plan.days} days</span>
+                      </div>
+
+                      <h4 className={`mt-4 text-xl font-black tracking-tight transition ${isMapped ? 'text-emerald-900' : 'text-slate-900'
+                        }`}>
+                        {plan.title}
+                      </h4>
+
+                      <p className="mt-3 text-sm leading-6 text-slate-600">{plan.summary}</p>
+
+                      <div className="mt-5 flex items-center justify-between text-xs text-slate-500">
+                        <span>{plan.activities.length} activities</span>
+                        <span className={`font-bold ${isMapped ? 'text-emerald-600' : ''}`}>
+                          {isMapped ? 'Currently Mapped' : 'Ready to map'}
+                        </span>
+                      </div>
+
+                      <div className="mt-5">
+                        <button
+                          type="button"
+                          className={`w-full rounded-full px-4 py-3 text-sm font-bold transition-all duration-300 pointer-events-none ${isMapped
+                              ? 'bg-emerald-200 text-emerald-800'
+                              : 'bg-slate-100 text-slate-500 group-hover:bg-sky-100 group-hover:text-sky-700'
+                            }`}
+                        >
+                          {isMapped ? 'Viewing Itinerary' : 'Click to View Itinerary'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-12 text-center text-sm leading-7 text-slate-500">
+                Submit a trip description to generate three polished travel plan options.
+              </div>
+            )}
+          </section>
+
+          <div className="grid gap-8 pb-16 xl:grid-cols-[minmax(0,1.2fr)_420px]">
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-md px-3 py-1 font-bold uppercase tracking-[0.08em] text-slate-700">Map View</p>
+                  <h3 className="mt-2 text-2xl font-black text-slate-900">
+                    {mappedPlan ? `${mappedPlan.title}` : ''}
+                  </h3>
+                </div>
+                <div className="flex gap-2">
+                  {isGeocoding && (
+                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                      Geocoding stops...
+                    </span>
+                  )}
+                  {unresolvedMarkerCount > 0 && (
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                      {unresolvedMarkerCount} stop{unresolvedMarkerCount === 1 ? '' : 's'} need coordinates
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <PlannerMap
+                markers={geocodedMarkers}
+                hoveredActivityId={hoveredActivityId}
+                selectedActivityId={selectedActivityId}
+                onMarkerHoverChange={setHoveredActivityId}
+                onMarkerClick={handleSelectMappedActivity}
+              />
+            </section>
+
+            <aside className="mt-14 rounded-[32px] border border-slate-200 bg-slate-950 p-6 text-slate-100 shadow-[0_24px_80px_rgba(15,23,42,0.24)]">
+              <div className="mb-5 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold uppercase tracking-[0.1em] text-sky-300">Selected Itinerary</p>
+                  {/* <h3 className="mt-2 text-2sm font-black">
+                  {selectedPlan ? selectedPlan.title : 'no plan selected'}
+                </h3> */}
+                </div>
+                <div className="mt-0 rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-xs font-semibold text-sky-200">
+                  {selectedPlan ? `${selectedPlan.days} days` : 'Awaiting plan'}
+                </div>
+              </div>
+
+              {selectedPlan ? (
+                <div className="space-y-5">
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p className="text-2xl font-bold leading-7 text-slate-200">{selectedPlan.title}</p>
+                    <div className="mt-3 flex items-center gap-3 text-sm uppercase tracking-[0.14em] text-sky-200">
+                      <span>{selectedPlan.activities.length} total stops</span>
+                      <span>{mappedPlanId === selectedPlan.id ? 'Currently mapped' : 'Not mapped yet'}</span>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={handleSavePlan}
+                        className="rounded-full bg-sky-500 px-7 py-5 text-sm font-black uppercase tracking-[0.14em] text-white transition hover:bg-sky-400"
+                      >
+                        Save to My Plans
+                      </button>
+                      {/* <button
                       type="button"
                       onClick={handleReservePlan}
                       className="rounded-full bg-amber-500 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-white transition hover:bg-amber-400"
                     >
                       Reserve Plan
                     </button> */}
-                  </div>
-                </div>
-
-                <div className="max-h-[540px] space-y-4 overflow-y-auto pr-2 scrollbar-refined">
-                  {selectedPlan.dayPlans.map((dayPlan) => (
-                    <div key={`${selectedPlan.id}-day-${dayPlan.dayNumber}`} className="space-y-3">
-                      <div className="sticky top-0 rounded-xl bg-slate-900/95 px-3 py-2 text-xs font-bold uppercase tracking-[0.16em] text-green-300 backdrop-blur">
-                        Day {dayPlan.dayNumber}
-                      </div>
-
-                      {dayPlan.activities.map((activity) => {
-                        const isHovered = hoveredActivityId === activity.id;
-                        const isSelected = selectedActivityId === activity.id;
-
-                        return (
-                          <button
-                            key={activity.id}
-                            type="button"
-                            onMouseEnter={() => setHoveredActivityId(activity.id)}
-                            onMouseLeave={() => setHoveredActivityId((current) => current === activity.id ? null : current)}
-                            onFocus={() => setHoveredActivityId(activity.id)}
-                            onBlur={() => setHoveredActivityId((current) => current === activity.id ? null : current)}
-                            onClick={() => setSelectedActivityId(activity.id)}
-                            className={`w-full rounded-2xl border p-4 text-left transition ${
-                              isSelected
-                                ? 'border-sky-400 bg-sky-500/15 shadow-[0_10px_30px_rgba(14,165,233,0.18)]'
-                                : isHovered
-                                  ? 'border-sky-300 bg-white/10'
-                                  : 'border-white/10 bg-white/5'
-                            }`}
-                          >
-                            <div className="flex items-start gap-3">
-                              <div
-                                className={`mt-0.5 flex h-8 w-8 items-center justify-center rounded-full text-sm font-black ${
-                                  isSelected || isHovered
-                                    ? 'bg-sky-400 text-slate-950'
-                                    : 'bg-white/10 text-white'
-                                }`}
-                              >
-                                {activity.order}
-                              </div>
-                              <div>
-                                <p className="text-sm font-bold text-white">{activity.name}</p>
-                                <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-sky-200">
-                                  {activity.time}
-                                </p>
-                              </div>
-                            </div>
-
-                            <p className="mt-3 text-sm text-slate-300">{activity.location}</p>
-                            <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-400">
-                              {activity.description}
-                            </p>
-                          </button>
-                        );
-                      })}
                     </div>
-                  ))}
-                </div>
+                  </div>
 
-                {/* {selectedActivity && (
+                  <div className="max-h-[540px] space-y-4 overflow-y-auto pr-2 scrollbar-refined">
+                    {selectedPlan.dayPlans.map((dayPlan) => (
+                      <div key={`${selectedPlan.id}-day-${dayPlan.dayNumber}`} className="space-y-3">
+                        <div className="sticky top-0 rounded-xl bg-slate-900/95 px-3 py-2 text-sm font-bold uppercase tracking-[0.16em] text-green-300 backdrop-blur">
+                          Day {dayPlan.dayNumber}
+                        </div>
+
+                        {dayPlan.activities.map((activity) => {
+                          const isHovered = hoveredActivityId === activity.id;
+                          const isSelected = selectedActivityId === activity.id;
+
+                          return (
+                            <button
+                              key={activity.id}
+                              type="button"
+                              onMouseEnter={() => setHoveredActivityId(activity.id)}
+                              onMouseLeave={() => setHoveredActivityId((current) => current === activity.id ? null : current)}
+                              onFocus={() => setHoveredActivityId(activity.id)}
+                              onBlur={() => setHoveredActivityId((current) => current === activity.id ? null : current)}
+                              onClick={() => setSelectedActivityId(activity.id)}
+                              className={`w-full rounded-2xl border p-4 text-left transition ${isSelected
+                                  ? 'border-sky-400 bg-sky-500/15 shadow-[0_10px_30px_rgba(14,165,233,0.18)]'
+                                  : isHovered
+                                    ? 'border-sky-300 bg-white/10'
+                                    : 'border-white/10 bg-white/5'
+                                }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div
+                                  className={`mt-0.5 flex h-8 w-8 items-center justify-center rounded-full text-sm font-black ${isSelected || isHovered
+                                      ? 'bg-sky-400 text-slate-950'
+                                      : 'bg-white/10 text-white'
+                                    }`}
+                                >
+                                  {activity.order}
+                                </div>
+                                <div>
+                                  <p className="text-base font-bold text-white">{activity.name}</p>
+                                  <p className="mt-1 text-sm font-semibold uppercase tracking-[0.14em] text-sky-200">
+                                    {activity.time}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <p className="mt-3 text-base text-slate-300">{activity.location}</p>
+                              <p className="mt-2 line-clamp-2 text-base leading-7 text-slate-400">
+                                {activity.description}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* {selectedActivity && (
                   <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4">
                     <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-200">
                       Activity Details
@@ -633,16 +626,16 @@ const GeneratePlannerPage: React.FC<GeneratePlannerPageProps> = ({ onNavigate, o
                     </div>
                   </div>
                 )} */}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-5 text-sm leading-7 text-slate-300">
-                Select one of the generated plans to inspect the full itinerary and send it to the map.
-              </div>
-            )}
-          </aside>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-5 text-sm leading-7 text-slate-300">
+                  Select one of the generated plans to inspect the full itinerary and send it to the map.
+                </div>
+              )}
+            </aside>
+          </div>
         </div>
       </div>
-    </div>
     </div>
   );
 };

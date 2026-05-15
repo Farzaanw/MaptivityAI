@@ -32,11 +32,17 @@ export default {
         'float': {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-8px)' },
+        },
+        'flowy-gradient': {
+          '0%': { 'background-position': '0% 50%' },
+          '50%': { 'background-position': '100% 50%' },
+          '100%': { 'background-position': '0% 50%' },
         }
       },
       animation: {
         'gradient-xy': 'gradient-xy 4s ease infinite',
         'float': 'float 3s ease-in-out infinite',
+        'flowy-gradient': 'flowy-gradient 8s ease infinite',
       }
     },
   },

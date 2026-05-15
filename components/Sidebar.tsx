@@ -150,16 +150,16 @@ const Sidebar: React.FC<SidebarProps> = ({
         {isOpen && (
           <div className="flex-1 flex flex-col h-full overflow-hidden p-6">
             <form onSubmit={handleSubmit} className="mb-2">
-              <label className="block text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">What are you looking for?</label>
+              <label className="block text-base font-bold text-gray-500 uppercase tracking-wider mb-2">What are you looking for?</label>
               <div className="relative">
                 <input
                   type="text"
                   value={localQuery}
                   onChange={(e) => setLocalQuery(e.target.value)}
                   placeholder="E.g. Coffee, Parks, Museums..."
-                  className="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-3 pl-10 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+                  className="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-3 pl-10 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-base"
                 />
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 absolute left-3 top-3.5" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-400 absolute left-3 top-3" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
                 </svg>
               </div>
@@ -170,14 +170,14 @@ const Sidebar: React.FC<SidebarProps> = ({
               />
             </form>
 
-            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-              <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center justify-between">
+            <div className="flex-1 overflow-y-auto pr-2 scrollbar-refined">
+              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center justify-between">
                 Activities Near You
-                <span className="text-xs font-medium bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">{activities.length} found</span>
+                <span className="text-sm font-medium bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">{activities.length} found</span>
               </h3>
 
               {error && (
-                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-base">
                   <p className="font-semibold">⚠️ Issue with Retrieval</p>
                   <p className="mt-1">{error}</p>
                 </div>
@@ -228,8 +228,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                     </>
                   ) : (
                     <>
-                      <p className="text-gray-500 font-medium">No activities found yet.</p>
-                      <p className="text-sm text-gray-400">Search an area to see what's happening.</p>
+                      <p className="text-gray-500 font-bold text-lg">No activities found yet.</p>
+                      <p className="text-base text-gray-400 font-medium">Search an area to see what's happening.</p>
                     </>
                   )}
                 </div>

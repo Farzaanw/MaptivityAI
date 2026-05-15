@@ -49,19 +49,19 @@ const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFa
 
     const renderStars = (rating: number = 0) => {
         return (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
                 {[1, 2, 3, 4, 5].map((s) => (
                     <svg
                         key={s}
                         xmlns="http://www.w3.org/2000/svg"
-                        className={`h-4 w-4 ${s <= Math.round(rating) ? 'text-amber-400 fill-amber-400' : 'text-gray-300'}`}
+                        className={`h-5 w-5 ${s <= Math.round(rating) ? 'text-amber-400 fill-amber-400' : 'text-gray-300'}`}
                         viewBox="0 0 20 20"
                         fill="currentColor"
                     >
                         <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                     </svg>
                 ))}
-                <span className="text-sm font-bold text-gray-700 ml-1">{rating}</span>
+                <span className="text-base font-bold text-gray-700 ml-1.5">{rating}</span>
             </div>
         );
     };
@@ -83,11 +83,11 @@ const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFa
                     className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500"
                     aria-label="Back to results"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
                 </button>
-                <span className="font-bold text-gray-900 truncate flex-1 ml-2">Details</span>
+                <span className="text-lg font-bold text-gray-900 truncate flex-1 ml-2">Details</span>
                 <button
                     onClick={handleFavoriteClick}
                     className={`p-2 rounded-full transition-all ${isFavorite ? 'text-red-500' : 'text-gray-300 hover:text-red-400'
@@ -112,7 +112,7 @@ const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFa
             </div>
 
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto scrollbar-refined">
                 {isLoading ? (
                     <div className="flex flex-col items-center justify-center h-64 gap-3">
                         <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
@@ -154,10 +154,10 @@ const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFa
                         )}
 
                         <div className="p-6">
-                            <h2 className="text-2xl font-black text-gray-900 leading-tight mb-2">
+                            <h2 className="text-3xl font-black text-gray-900 leading-tight mb-2">
                                 {details.displayName?.text}
                             </h2>
-
+ 
                             <div className="flex items-center gap-4 mb-6">
                                 {renderStars(details.rating)}
                                 {reviewsLink ? (
@@ -165,16 +165,16 @@ const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFa
                                         href={reviewsLink}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="text-xs text-indigo-600 font-semibold hover:underline"
+                                        className="text-sm text-indigo-600 font-semibold hover:underline"
                                         title="Open full Google reviews"
                                     >
                                         ({details.userRatingCount} reviews)
                                     </a>
                                 ) : (
-                                    <span className="text-xs text-gray-400 font-medium">({details.userRatingCount} reviews)</span>
+                                    <span className="text-sm text-gray-400 font-medium">({details.userRatingCount} reviews)</span>
                                 )}
                                 {details.priceLevel && (
-                                    <span className="text-sm font-bold text-green-600">
+                                    <span className="text-base font-bold text-green-600">
                                         {details.priceLevel === 'PRICE_LEVEL_INEXPENSIVE' ? '$' :
                                             details.priceLevel === 'PRICE_LEVEL_MODERATE' ? '$$' :
                                                 details.priceLevel === 'PRICE_LEVEL_EXPENSIVE' ? '$$$' : '$$$$'}
@@ -191,29 +191,29 @@ const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFa
                             <div className="space-y-4 mb-8">
                                 {details.formattedAddress && (
                                     <div className="flex gap-3">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                                         </svg>
-                                        <span className="text-sm text-gray-600 leading-snug">{details.formattedAddress}</span>
+                                        <span className="text-base text-gray-600 leading-snug">{details.formattedAddress}</span>
                                     </div>
                                 )}
-
+ 
                                 {details.internationalPhoneNumber && (
                                     <div className="flex gap-3">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                                         </svg>
-                                        <span className="text-sm text-gray-600">{details.internationalPhoneNumber}</span>
+                                        <span className="text-base text-gray-600">{details.internationalPhoneNumber}</span>
                                     </div>
                                 )}
-
+ 
                                 {details.websiteUri && (
                                     <div className="flex gap-3">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                                         </svg>
-                                        <a href={details.websiteUri} target="_blank" rel="noreferrer" className="text-sm text-indigo-600 font-bold hover:underline truncate">
+                                        <a href={details.websiteUri} target="_blank" rel="noreferrer" className="text-base text-indigo-600 font-bold hover:underline truncate">
                                             Official Website
                                         </a>
                                     </div>
@@ -235,7 +235,7 @@ const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFa
                                     </h3>
                                     <div className="bg-gray-50 rounded-2xl p-4 space-y-2">
                                         {details.regularOpeningHours.weekdayDescriptions?.map((desc, i) => (
-                                            <p key={i} className="text-xs text-gray-600 flex justify-between">
+                                            <p key={i} className="text-sm text-gray-600 flex justify-between">
                                                 {desc.split(': ')[0]} <span className="font-bold">{desc.split(': ')[1]}</span>
                                             </p>
                                         ))}
@@ -266,8 +266,8 @@ const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFa
                                                         <div className="w-8 h-8 rounded-full bg-gray-200" aria-hidden="true" />
                                                     )}
                                                     <div>
-                                                        <p className="text-xs font-bold text-gray-900">{authorName}</p>
-                                                        <p className="text-[10px] text-gray-400">{rev.relativePublishTimeDescription}</p>
+                                                        <p className="text-sm font-bold text-gray-900">{authorName}</p>
+                                                        <p className="text-xs text-gray-400">{rev.relativePublishTimeDescription}</p>
                                                     </div>
                                                     <div className="ml-auto flex gap-0.5">
                                                         {Array.from({ length: 5 }).map((_, j) => (
@@ -278,9 +278,9 @@ const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFa
                                                     </div>
                                                 </div>
                                                 {reviewText ? (
-                                                    <p className="text-xs text-gray-600 leading-relaxed italic line-clamp-3">"{reviewText}"</p>
+                                                    <p className="text-sm text-gray-600 leading-relaxed italic line-clamp-3">"{reviewText}"</p>
                                                 ) : (
-                                                    <p className="text-xs text-gray-400 italic">No review text provided.</p>
+                                                    <p className="text-sm text-gray-400 italic">No review text provided.</p>
                                                 )}
                                             </div>
                                             );
@@ -293,10 +293,10 @@ const DetailsSidebar: React.FC<DetailsSidebarProps> = ({ activity, onClose, isFa
                                                 href={reviewsLink}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 group/more"
+                                                className="text-sm font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 group/more"
                                             >
                                                 View more reviews on Google Maps
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 transition-transform group-hover/more:translate-x-0.5" viewBox="0 0 20 20" fill="currentColor">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 transition-transform group-hover/more:translate-x-0.5" viewBox="0 0 20 20" fill="currentColor">
                                                     <path fillRule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
                                                 </svg>
                                             </a>

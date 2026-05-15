@@ -15,27 +15,23 @@ const PlannerModeSelection: React.FC<PlannerModeSelectionProps> = ({ onNavigate 
     <div className="relative flex-1 min-h-0 overflow-hidden bg-slate-50">
       {/* Moving Background Glow Concept */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* Stationary base colors */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(34,197,94,0.2),_transparent_50%),radial-gradient(circle_at_bottom_right,_rgba(14,165,233,0.2),_transparent_50%)]" />
-        
-        {/* Circulating Light Layer */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150vmax] h-[150vmax] opacity-[0.4]">
-          <div className="w-full h-full animate-[spin_15s_linear_infinite] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(34,197,94,0.8)_90deg,rgba(14,165,233,0.8)_180deg,rgba(79,70,229,0.8)_270deg,transparent_360deg)] blur-[120px]" />
-        </div>
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-emerald-400/20 via-sky-400/20 to-purple-400/20 animate-flowy-gradient bg-[length:200%_200%]"
+        />
       </div>
 
       <div className="relative z-10 h-full overflow-y-auto px-6 py-10 sm:px-10">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
           <section className={topBannerClass}>
-            <div className="inline-flex rounded-full bg-slate-900 px-4 py-1 text-xs font-black uppercase tracking-[0.2em] text-white">
+            <div className="inline-flex rounded-full bg-slate-900 px-4 py-1 text-xs font-black uppercase tracking-[0.2em] text-white animate-float shadow-lg">
               Planner
             </div>
             <h2 className="mt-6 max-w-3xl text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
               Plan Your Next Trip!
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
-              Traveling somewhere new? Plan your full trip iternary with either our AI-powered trip planner 
-              or our manual planner, where you can organize, customize, and map out your perfect trip. 
+              Traveling somewhere new? Plan your full trip iternary with either our AI-powered trip planner
+              or our manual planner, where you can organize, customize, and map out your perfect trip.
             </p>
           </section>
 
@@ -55,8 +51,8 @@ const PlannerModeSelection: React.FC<PlannerModeSelectionProps> = ({ onNavigate 
                 </div>
                 <h3 className="mt-5 text-3xl font-black tracking-tight text-slate-950">Generate Plan</h3>
                 <p className="mt-4 max-w-lg text-base leading-7 text-slate-600">
-                  Let AI create a personalized itinerary based on your preferences, 
-                  then review the plan to polish it to your liking. 
+                  Let AI create a personalized itinerary based on your preferences,
+                  then review the plan to polish it to your liking.
                 </p>
                 <div className="mt-6 inline-flex items-center gap-3 rounded-full bg-slate-900 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-slate-200 transition-all duration-300 group-hover:bg-sky-600 group-hover:shadow-sky-100">
                   Start Generating
