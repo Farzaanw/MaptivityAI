@@ -378,15 +378,24 @@ const PlannedActivityCard: React.FC<{
       style={style}
       className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm"
     >
-      <div className="flex items-start gap-3">
-        <button
-          type="button"
-          className="mt-1 flex h-10 w-10 shrink-0 cursor-grab items-center justify-center rounded-2xl bg-slate-900 text-xs font-black uppercase tracking-[0.14em] text-white active:cursor-grabbing"
+      <div className="flex items-start gap-4">
+        <div
+          className="h-16 w-16 shrink-0 cursor-grab overflow-hidden rounded-2xl bg-slate-100 active:cursor-grabbing touch-none"
           {...listeners}
           {...attributes}
         >
-          Move
-        </button>
+          {activity.photoUrl ? (
+            <img 
+              src={activity.photoUrl} 
+              alt={activity.name} 
+              className="pointer-events-none h-full w-full object-cover" 
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Move
+            </div>
+          )}
+        </div>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
@@ -782,13 +791,13 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
           <section className="rounded-[36px] border border-white/60 bg-white/80 p-8 shadow-[0_24px_80px_rgba(15,23,42,0.1)] backdrop-blur transition-all duration-500 animate-float hover:animate-none">
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="inline-flex items-center rounded-full bg-emerald-100 px-4 py-1 text-sm font-bold uppercase tracking-[0.1em] text-emerald-700 animate-float shadow-lg">
+              <div className="inline-flex items-center rounded-full bg-emerald-100 px-4 py-1.5 text-sm sm:text-base font-bold uppercase tracking-wider text-emerald-700 animate-float shadow-sm">
                 Build Your Own
               </div>
               <button
                 type="button"
                 onClick={() => onNavigate('/planner')}
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                className="rounded-full border-2 border-sky-200 bg-white px-5 sm:px-6 py-3 sm:py-4 text-sm sm:text-base font-bold text-sky-800 transition hover:bg-sky-50 shadow-sm"
               >
                 Back to Planner Modes
               </button>
@@ -796,10 +805,10 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
 
             <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
               <div>
-                <h2 className="text-4xl font-black tracking-tight text-slate-950">
+                <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-slate-900">
                   Plan Your Perfect Trip, Your Way
                 </h2>
-                <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
+                <p className="mt-4 sm:mt-6 max-w-2xl text-base sm:text-lg leading-relaxed text-slate-600 font-medium">
                   Search for places or Select activities that you've favoriated in the app,
                   drag them to the planning canvas, add days to your trip, and reorder them
                   until your itinerary feels just right.
@@ -960,43 +969,43 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
           >
             <div className="grid gap-8 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] focus:outline-none">
               <section className="rounded-[32px] border border-slate-200 bg-white/85 p-6 shadow-[0_18px_70px_rgba(15,23,42,0.08)]">
-                <div className="mb-5">
-                  <p className="text-sm font-bold uppercase tracking-[0.1em] text-slate-500">Activity Discovery</p>
-                  <div className="mt-5 inline-flex rounded-full border border-slate-200 bg-slate-100 p-1">
+                <div className="mb-6">
+                  <p className="text-base font-bold uppercase tracking-wider text-slate-500">Activity Discovery</p>
+                  <div className="mt-6 inline-flex flex-wrap gap-1 rounded-[24px] border border-slate-200 bg-slate-100 p-1.5">
                     <button
                       type="button"
                       onClick={() => setDiscoveryMode('search')}
-                      className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.14em] transition ${discoveryMode === 'search'
+                      className={`rounded-full px-5 py-2.5 text-sm font-bold uppercase tracking-wider transition ${discoveryMode === 'search'
                           ? 'bg-white text-slate-900 shadow-sm'
                           : 'text-slate-500 hover:text-slate-700'
                         }`}
                     >
-                      Search By Location
+                      Search
                     </button>
                     <button
                       type="button"
                       onClick={() => setDiscoveryMode('favorites')}
-                      className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.14em] transition ${discoveryMode === 'favorites'
+                      className={`rounded-full px-5 py-2.5 text-sm font-bold uppercase tracking-wider transition ${discoveryMode === 'favorites'
                           ? 'bg-white text-rose-500 shadow-sm'
                           : 'text-slate-500 hover:text-rose-600'
                         }`}
                     >
-                      Show Favorites
+                      Favorites
                     </button>
                     <button
                       type="button"
                       onClick={() => setDiscoveryMode('plans')}
-                      className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.14em] transition ${discoveryMode === 'plans'
+                      className={`rounded-full px-5 py-2.5 text-sm font-bold uppercase tracking-wider transition ${discoveryMode === 'plans'
                           ? 'bg-white text-emerald-600 shadow-sm'
                           : 'text-slate-500 hover:text-emerald-700'
                         }`}
                     >
-                      Show My Plans
+                      My Plans
                     </button>
                   </div>
                 </div>
 
-                <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+                <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     {discoveryMode === 'search' && (
                       <PlannerLocationSearch
@@ -1006,14 +1015,14 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                       />
                     )}
                     {discoveryMode === 'favorites' && (
-                      <div className="py-2 text-sm font-bold text-rose-500 uppercase tracking-widest">Your Favorites</div>
+                      <div className="py-2 text-base font-bold text-rose-500 uppercase tracking-widest">Your Favorites</div>
                     )}
                     {discoveryMode === 'plans' && (
-                      <div className="py-2 text-sm font-bold text-emerald-600 uppercase tracking-widest">Saved Itineraries</div>
+                      <div className="py-2 text-base font-bold text-emerald-600 uppercase tracking-widest">Saved Itineraries</div>
                     )}
                   </div>
                   {discoveryMode !== 'plans' && (
-                    <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                    <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-600">
                       {(discoveryMode === 'search' ? discoveredActivities : favoriteActivities).length} found
                     </div>
                   )}
@@ -1068,44 +1077,37 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                 )}
               </section>
 
-              <section className="relative rounded-[32px] border border-slate-200 bg-slate-950 p-6 text-slate-100 shadow-[0_24px_80px_rgba(15,23,42,0.24)]">
+              <section className="relative rounded-[32px] border border-slate-200 bg-white/90 p-6 text-slate-900 shadow-xl backdrop-blur-md">
                 {isResetting && (
-                  <div className="absolute inset-0 z-[60] flex items-center justify-center overflow-hidden rounded-[32px] bg-slate-900/60 p-6 backdrop-blur-md animate-in fade-in duration-300">
+                  <div className="absolute inset-0 z-[60] flex items-center justify-center overflow-hidden rounded-[32px] bg-white/70 p-6 backdrop-blur-md animate-in fade-in duration-300">
                     <div className="flex flex-col items-center gap-6">
                       <div className="text-6xl animate-spin" style={{ animationDuration: '3s' }}>
                         ♻️
                       </div>
-                      <p className="text-sm font-black uppercase tracking-[0.25em] text-white">Saving this Plan</p>
+                      <p className="text-base font-bold uppercase tracking-wider text-slate-700">Saving this Plan</p>
                     </div>
                   </div>
                 )}
 
                 {pendingPlanToSwitch && (
-                  <div className="absolute inset-0 z-50 flex items-center justify-center overflow-hidden rounded-[32px] bg-slate-900/60 p-6 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className="w-full max-w-sm rounded-[32px] border border-white/20 bg-slate-900 p-8 shadow-2xl animate-in zoom-in-95 duration-300">
-                      {/* <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
-                      <svg viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current stroke-2">
-                        <path d="M11 5L6 9H2V15H6L11 19V5Z" />
-                        <path d="M19.07 4.93C20.94 6.8 22 9.3 22 12C22 14.7 20.94 17.2 19.07 19.07" />
-                        <path d="M15.54 8.46C16.48 9.4 17 10.64 17 12C17 13.36 16.48 14.6 15.54 15.54" />
-                      </svg>
-                    </div> */}
-                      <h4 className="mt-6 text-xl font-black text-center text-white">Start editing this plan?</h4>
-                      <p className="mt-2 text-sm text-center leading-6 text-slate-400">
+                  <div className="absolute inset-0 z-50 flex items-center justify-center overflow-hidden rounded-[32px] bg-white/70 p-6 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="w-full max-w-sm rounded-[32px] border border-slate-200 bg-white p-8 shadow-2xl animate-in zoom-in-95 duration-300">
+                      <h4 className="mt-6 text-2xl font-bold tracking-tight text-center text-slate-900">Start editing this plan?</h4>
+                      <p className="mt-4 text-base text-center leading-relaxed text-slate-600 font-medium">
                         This will automatically save your current progress to "My Plans" and load the new itinerary into here
                       </p>
-                      <div className="mt-8 flex gap-3">
+                      <div className="mt-8 flex gap-4">
                         <button
                           type="button"
                           onClick={confirmPlanSwitch}
-                          className="flex-1 rounded-full bg-emerald-500 py-3 text-sm font-black text-white transition hover:bg-emerald-600"
+                          className="flex-1 rounded-full bg-emerald-500 py-4 text-base font-bold text-white transition hover:bg-emerald-400"
                         >
                           Yes, Switch
                         </button>
                         <button
                           type="button"
                           onClick={() => setPendingPlanToSwitch(null)}
-                          className="flex-1 rounded-full bg-white/10 py-3 text-sm font-black text-white transition hover:bg-white/20"
+                          className="flex-1 rounded-full bg-slate-100 py-4 text-base font-bold text-slate-600 transition hover:bg-slate-200"
                         >
                           Cancel
                         </button>
@@ -1114,47 +1116,47 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                   </div>
                 )}
 
-                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-300">Planning Canvas</p>
-                    <h3 className="mt-2 text-3xl font-black">Trip Itinerary</h3>
+                    <p className="text-base font-bold uppercase tracking-wider text-sky-600">Planning Canvas</p>
+                    <div className="mt-2 flex items-center gap-4">
+                      <h3 className="text-3xl font-bold text-slate-900">Trip Itinerary</h3>
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold uppercase tracking-wider text-slate-500 shadow-sm">
+                        {plannedCount} selected
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200">
-                      {plannedCount} selected
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleSavePlan}
-                      disabled={plannedCount === 0}
-                      className="rounded-full bg-white px-5 py-3 text-base font-black text-slate-950 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Save to My Plans
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleAddDay}
-                      className="rounded-full bg-emerald-400 px-4 py-2 text-md font-black text-slate-950 transition hover:bg-emerald-300"
-                    >
-                      Add Day
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSavePlan}
+                    disabled={plannedCount === 0}
+                    className="rounded-full bg-sky-500 px-6 py-3 text-base sm:text-lg font-bold text-white shadow-md transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Save to My Plans
+                  </button>
                 </div>
 
-                <div className="mb-6 flex flex-wrap gap-3">
+                <div className="mb-8 flex flex-wrap items-center gap-3">
                   {plan.days.map((day) => (
                     <button
                       key={day.day}
                       type="button"
                       onClick={() => setActiveDay(day.day)}
-                      className={`rounded-full px-4 py-2 text-sm font-bold transition ${activeDay === day.day
-                          ? 'bg-white text-slate-950'
-                          : 'border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
+                      className={`rounded-full px-5 py-2.5 text-base font-bold transition ${activeDay === day.day
+                          ? 'bg-slate-900 text-white shadow-md'
+                          : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                         }`}
                     >
                       Day {day.day}
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    onClick={handleAddDay}
+                    className="rounded-full border-2 border-dashed border-slate-300 bg-transparent px-5 py-2.5 text-base font-bold text-slate-500 transition hover:border-slate-400 hover:bg-white hover:text-slate-700"
+                  >
+                    + Add Day
+                  </button>
                 </div>
 
                 <div className="space-y-5">
@@ -1163,22 +1165,22 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                       <DayDropZone day={day.day} isActive={activeDay === day.day}>
                         <div className="mb-4 flex items-center justify-between">
                           <div>
-                            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                            <p className="text-sm font-bold uppercase tracking-wider text-slate-500">
                               Day {day.day}
                             </p>
-                            <h4 className="mt-2 text-2xl font-black text-slate-950">
+                            {/* <h4 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
                               {day.activities.length > 0 ? 'Drag to reorder your stops' : 'Drop activities here'}
-                            </h4>
+                            </h4> */}
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                            <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-600">
                               {day.activities.length} stop{day.activities.length === 1 ? '' : 's'}
                             </span>
                             {plan.days.length > 1 && (
                               <button
                                 type="button"
                                 onClick={() => handleRemoveDay(day.day)}
-                                className="rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-600 transition hover:bg-rose-100"
+                                className="rounded-full bg-rose-50 px-4 py-2 text-sm font-bold text-rose-600 transition hover:bg-rose-100"
                               >
                                 Remove Day
                               </button>
@@ -1201,8 +1203,8 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                                   />
                                   {index < day.activities.length - 1 && (
                                     <div className="flex justify-center">
-                                      <div className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-100 px-3 py-2 text-slate-500 shadow-sm">
-                                        <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
+                                      <div className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-slate-400 shadow-sm">
+                                        <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
                                           <path d="M12 4a1 1 0 0 1 1 1v10.59l3.3-3.29a1 1 0 1 1 1.4 1.41l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 0 1 1.4-1.41L11 15.59V5a1 1 0 0 1 1-1Z" />
                                         </svg>
                                       </div>
@@ -1213,8 +1215,8 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                             </div>
                           </SortableContext>
                         ) : (
-                          <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-14 text-center text-sm leading-7 text-slate-500">
-                            Pull activities from the discovery panel and drop them here to build Day {day.day}.
+                          <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-14 text-center text-base leading-7 text-slate-500 font-medium">
+                            Drag and drop activities from the discovery panel here
                           </div>
                         )}
                       </DayDropZone>
@@ -1222,9 +1224,9 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                   ))}
                 </div>
 
-                <div className="mt-6 rounded-[24px] border border-white/10 bg-white/5 p-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-300">Map-ready structure</p>
-                  <p className="mt-3 text-sm leading-7 text-slate-300">
+                <div className="mt-8 rounded-[24px] border border-emerald-100 bg-emerald-50 px-6 py-5">
+                  <p className="text-sm font-bold uppercase tracking-wider text-emerald-700">Map-ready structure</p>
+                  <p className="mt-3 text-base leading-relaxed text-emerald-900/80 font-medium">
                     Every selected activity keeps its Google Places `lat` and `lng`, so this itinerary
                     can be passed into map markers without reshaping the data later.
                   </p>

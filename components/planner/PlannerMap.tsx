@@ -202,8 +202,11 @@ const PlannerMap: React.FC<PlannerMapProps> = ({
       )}
 
       {googleReady && resolvedMarkers.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-50/90 px-8 text-center text-sm leading-7 text-slate-500">
-          Send a plan to the map to see its numbered activity markers here.
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50/90 p-8 text-center backdrop-blur-sm z-10 transition-all">
+          <div className="text-4xl mb-6 animate-pulse">📍</div>
+          <p className="max-w-md text-base leading-7 text-slate-500 font-medium">
+            Send a plan to the map to see its numbered activity markers here.
+          </p>
         </div>
       )}
     </div>

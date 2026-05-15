@@ -375,7 +375,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, onNavigate }) => {
               { id: 'planner', label: 'Planner' },
               { id: 'my-plans', label: 'My Plans' },
               { id: 'favorites', label: 'Favorites' },
-            ] as { id: AppPage; label: string }[]).map(({ id, label }) => (
+            ] as { id: AppPage; label: string }[]).map(({ id, label }, index) => (
               <button
                 key={id}
                 onClick={() => onNavigate(id)}
