@@ -376,7 +376,7 @@ const PlannedActivityCard: React.FC<{
     <div
       ref={setNodeRef}
       style={style}
-      className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm"
+      className="group relative overflow-hidden rounded-[22px] border border-slate-200 bg-white p-4 pr-[12%] shadow-sm transition hover:border-slate-300"
     >
       <div className="flex items-start gap-4">
         <div
@@ -400,13 +400,6 @@ const PlannedActivityCard: React.FC<{
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <p className="text-base font-black text-slate-900">{activity.name}</p>
-            <button
-              type="button"
-              onClick={onRemove}
-              className="rounded-full bg-rose-50 px-3 py-1 text-sm font-bold text-rose-600 transition hover:bg-rose-100"
-            >
-              Remove
-            </button>
           </div>
           <p className="mt-2 text-base leading-6 text-slate-600">{activity.address}</p>
           <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
@@ -421,6 +414,17 @@ const PlannedActivityCard: React.FC<{
           </div>
         </div>
       </div>
+
+      <button
+        type="button"
+        onClick={onRemove}
+        className="absolute bottom-0 right-0 top-0 flex w-[10%] items-center justify-center bg-rose-400 text-white transition-all duration-200 hover:bg-rose-700 focus:outline-none"
+        title="Remove Stop"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
     </div>
   );
 };
@@ -457,9 +461,9 @@ function buildSavedManualPlan(plan: Plan, destination: PlannerLocation | null, e
     id: existingId || `saved-manual-${plan.id}-${Date.now()}`,
     createdAt: new Date().toISOString(),
     title: destination ? `${destination.name} custom plan` : 'Custom manual plan',
-    subtitle: destination
-      ? `A hand-built itinerary centered around ${destination.name}.`
-      : 'A hand-built itinerary created with the manual planner.',
+    // subtitle: destination
+    //   ? `A hand-built itinerary centered around ${destination.name}.`
+    //   : 'A hand-built itinerary created with the manual planner.',
     destination,
     days: plan.days.length,
     activityCount,
@@ -502,6 +506,19 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
     () => plan.days.reduce((count, day) => count + day.activities.length, 0),
     [plan],
   );
+
+  const planTitle = useMemo(() => {
+    if (editingPlanId) {
+      const saved = savedPlans.find((p) => p.id === editingPlanId);
+      if (saved) {
+        return saved.title.replace(/\s*(?:USA\s*)?custom plan/gi, '').trim();
+      }
+    }
+    if (selectedLocation) {
+      return selectedLocation.name.replace(/\s*USA\s*/gi, '').trim();
+    }
+    return 'Custom Plan';
+  }, [editingPlanId, savedPlans, selectedLocation]);
 
   const favoriteActivities = useMemo(
     () => favorites.map(mapFavoriteToPlannerActivity),
@@ -809,9 +826,7 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                   Plan Your Perfect Trip, Your Way
                 </h2>
                 <p className="mt-4 sm:mt-6 max-w-2xl text-base sm:text-lg leading-relaxed text-slate-600 font-medium">
-                  Search for places or Select activities that you've favoriated in the app,
-                  drag them to the planning canvas, add days to your trip, and reorder them
-                  until your itinerary feels just right.
+                  Search or select favorited places and activities, drag them to the planning canvas, add trip days, and reorder until your itinerary is perfect.
                 </p>
 
                 <div className="mt-8">
@@ -1018,7 +1033,10 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                       <div className="py-2 text-base font-bold text-rose-500 uppercase tracking-widest">Your Favorites</div>
                     )}
                     {discoveryMode === 'plans' && (
-                      <div className="py-2 text-base font-bold text-emerald-600 uppercase tracking-widest">Saved Itineraries</div>
+                      <>
+                        <div className="py-2 text-base font-bold text-emerald-600 uppercase tracking-widest">Saved Itineraries</div>
+                        <div className="mb-1 text-sm text-slate-700 tracking-widest">Open your existing plans to continue building them!</div>
+                      </>
                     )}
                   </div>
                   {discoveryMode !== 'plans' && (
@@ -1120,10 +1138,10 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                   <div>
                     <p className="text-base font-bold uppercase tracking-wider text-sky-600">Planning Canvas</p>
                     <div className="mt-2 flex items-center gap-4">
-                      <h3 className="text-3xl font-bold text-slate-900">Trip Itinerary</h3>
-                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold uppercase tracking-wider text-slate-500 shadow-sm">
+                      <h3 className="text-3xl font-bold text-slate-900">{planTitle}</h3>
+                      {/* <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold uppercase tracking-wider text-slate-500 shadow-sm">
                         {plannedCount} selected
-                      </span>
+                      </span> */}
                     </div>
                   </div>
                   <button
@@ -1157,6 +1175,15 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                   >
                     + Add Day
                   </button>
+                  {plan.days.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveDay(activeDay)}
+                      className="rounded-full bg-rose-50 px-5 py-2.5 text-base font-bold text-rose-600 transition hover:bg-rose-100"
+                    >
+                      Remove Day
+                    </button>
+                  )}
                 </div>
 
                 <div className="space-y-5">
@@ -1176,15 +1203,6 @@ const ManualPlannerPage: React.FC<ManualPlannerPageProps> = ({
                             <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-600">
                               {day.activities.length} stop{day.activities.length === 1 ? '' : 's'}
                             </span>
-                            {plan.days.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveDay(day.day)}
-                                className="rounded-full bg-rose-50 px-4 py-2 text-sm font-bold text-rose-600 transition hover:bg-rose-100"
-                              >
-                                Remove Day
-                              </button>
-                            )}
                           </div>
                         </div>
 

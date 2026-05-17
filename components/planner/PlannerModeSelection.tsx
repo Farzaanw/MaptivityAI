@@ -5,10 +5,10 @@ interface PlannerModeSelectionProps {
 }
 
 const cardBaseClass =
-  'group relative overflow-hidden rounded-[34px] border border-white/60 bg-white/80 p-8 text-left shadow-[0_28px_90px_rgba(15,23,42,0.12)] backdrop-blur transition-all duration-500 animate-float hover:animate-none hover:scale-[1.03] hover:shadow-[0_40px_120px_rgba(15,23,42,0.2)] focus:outline-none focus:ring-4 focus:ring-sky-200';
+  'group relative overflow-hidden rounded-[34px] border border-white/60 bg-white/80 p-8 text-left shadow-[0_28px_90px_rgba(15,23,42,0.12)] backdrop-blur transition-all duration-500 animate-float hover:animate-none hover:scale-[1.03] hover:-translate-y-2 hover:shadow-[0_40px_120px_rgba(15,23,42,0.2)] focus:outline-none focus:ring-4 focus:ring-sky-200';
 
 const topBannerClass =
-  'group relative overflow-hidden rounded-[34px] border border-white/60 bg-white/75 p-8 text-left shadow-[0_28px_90px_rgba(15,23,42,0.12)] backdrop-blur transition-all duration-500 animate-float hover:animate-none';
+  'group relative overflow-hidden rounded-[34px] border border-white/60 bg-white/75 p-8 text-left shadow-[0_28px_90px_rgba(15,23,42,0.12)] backdrop-blur transition-all duration-500';
 
 const PlannerModeSelection: React.FC<PlannerModeSelectionProps> = ({ onNavigate }) => {
   return (
@@ -23,7 +23,7 @@ const PlannerModeSelection: React.FC<PlannerModeSelectionProps> = ({ onNavigate 
       <div className="relative z-10 h-full overflow-y-auto px-6 py-10 sm:px-10">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
           <section className={topBannerClass}>
-            <div className="inline-flex rounded-full bg-slate-900 px-4 py-1 text-xs font-black uppercase tracking-[0.2em] text-white animate-float shadow-lg">
+            <div className="inline-flex rounded-full bg-slate-900 px-4 py-1 text-xs font-black uppercase tracking-[0.2em] text-white shadow-lg">
               Planner
             </div>
             <h2 className="mt-6 max-w-3xl text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">

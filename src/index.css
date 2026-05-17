@@ -11,6 +11,32 @@
 
 @import "tailwindcss";
 
+@theme {
+  --animate-gradient-xy: gradient-xy 4s ease infinite;
+  --animate-float: float 3s ease-in-out infinite;
+  --animate-flowy-gradient: flowy-gradient 8s ease infinite;
+
+  @keyframes gradient-xy {
+    0%, 100% {
+      background-size: 200% 200%;
+      background-position: 0% 50%;
+    }
+    50% {
+      background-size: 200% 200%;
+      background-position: 100% 50%;
+    }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  @keyframes flowy-gradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+}
+
 @layer utilities {
   /* Modern, subtle scrollbar for dark containers */
   .scrollbar-refined {
